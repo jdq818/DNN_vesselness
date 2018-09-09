@@ -200,13 +200,10 @@ void WriteModCA2Txt(char *chFileName,vector<PointCordTypeDef>vPBr)
 {
 	ofstream WriteFileTxt(chFileName,ios::out);
 	int nPointNum = vPBr.size();
-	int nx,ny,nz;	
 	for (int i = 0; i < nPointNum; i++)
 	{
-		nx= vPBr[i].x+1;
-		ny= vPBr[i].y+1;
-		nz= vPBr[i].z+1;
-		WriteFileTxt <<right<<fixed<<setfill('0')<<setprecision(4)<< nx<<' '<<ny<<' '<<nz<<'\n';
+		
+		WriteFileTxt <<right<<fixed<<setfill('4')<<setprecision(4)<<vPBr[i].x<<' '<<vPBr[i].y<<' '<<vPBr[i].z<<'\n';
 
 	}	
 
@@ -235,264 +232,6 @@ bool GenBranch(vector<PointCordTypeDef> vPSEPont,vector<BraTypeDef>& vBraPonts)
 			}
 
 		}
-	}
-	return true;
-}
-bool InitBra(BraTypeDef &BParPont,PointCordTypeDef initPont)
-{
-	BParPont.p=initPont;
-	BParPont.lchild=initPont;
-	BParPont.rchild=initPont;
-	BParPont.parent=initPont;
-	return true;
-}
-bool FindEndPinvParP(PointCordTypeDef PEndPonts,vector<BraTypeDef> vBraParPonts,int &nPosi)
-{
-	for(int i=0;i<vBraParPonts.size();i++)
-	{
-		if(PEndPonts.x==vBraParPonts[i].p.x&&PEndPonts.y==vBraParPonts[i].p.y&&PEndPonts.z==vBraParPonts[i].p.z)
-		{
-			nPosi=i;
-			return true;
-		}
-	}
-	return false;
-}
-bool FindEndPinvParP1(PointCordTypeDef PEndPonts,vector<PointCordTypeDef> vBraParPonts,int *flag)
-{
-	bool bfind=false;
-	for(int i=0;i<vBraParPonts.size();i++)
-	{
-		if(PEndPonts.x==vBraParPonts[i].x&&PEndPonts.y==vBraParPonts[i].y&&PEndPonts.z==vBraParPonts[i].z)
-		{
-
-			flag[i]=1;
-			bfind= true;
-		}
-	}
-	return false;
-}
-float CalcDist(PointCordTypeDef PBPont,PointCordTypeDef PBPontNext,zxhImageDataT<short>&imgReadRaws)
-{
-	float nP[3]={PBPont.x,PBPont.y,PBPont.z};
-	float nPN[3]={PBPontNext.x,PBPontNext.y,PBPontNext.z};
-	imgReadRaws.GetImageInfo()->ImageToWorld(nP);
-	imgReadRaws.GetImageInfo()->ImageToWorld(nPN);
-	float fDist=zxh::VectorOP_Distance(nP,nPN,3);
-	return fDist;
-}
-//if (DeteChlPonts(vPParPLR,vPChlPLR,imgReadRaws,consfMindist,PparPont,vPchlPont))//find the two children points
-bool DeteChlPonts(vector<PointCordTypeDef>vPParPLR,vector<PointCordTypeDef> vPChlPLR,zxhImageDataT<short>& imgReadRaws,const float consfMindist,PointCordTypeDef &PparPont,vector<PointCordTypeDef>&vPChlPont)
-{
-
-	vector<PointCordTypeDef> vPChldPont,vPChldOrderPont;
-	vPChldPont.clear();
-	vPChldOrderPont.clear();
-	PointCordTypeDef PpbP,PpbE,PpbNS;
-	for(int i=0;i<vPParPLR.size();i++)
-	{
-		PpbP=vPParPLR[i];
-		for(int j=0;j<vPChlPLR.size();j++)
-		{
-			PointCordTypeDef PCPont=vPChlPLR[j];
-			float fDist=CalcDist(PpbP,PCPont,imgReadRaws);
-			if(fDist<consfMindist)
-			{
-				vPChlPont.push_back(PCPont);
-			}
-		}
-		if (vPChlPont.size()==2)
-		{
-			if(vPChlPont[0].b<vPChlPont[1].b)
-			{
-				vPChldOrderPont.push_back(vPChlPont[0]);
-				vPChldOrderPont.push_back(vPChlPont[1]);
-			}
-			else
-			{
-				vPChldOrderPont.push_back(vPChlPont[1]);
-				vPChldOrderPont.push_back(vPChlPont[0]);
-			}
-			vPChlPont.clear();
-			vPChlPont.assign(vPChldOrderPont.begin(), vPChldOrderPont.end());  
-			PparPont=PpbP;
-			return true;
-		}
-		else
-		{
-			vPChlPont.clear();
-		}
-	}
-
-
-	return false;
-}
-bool IsNormTri(PointCordTypeDef Pp,PointCordTypeDef PCp,PointCordTypeDef PCNextp,zxhImageDataT<short>& imgReadRaws)
-{
-	float fPp[3]={Pp.x,Pp.y,Pp.z};
-	float fPCp[3]={PCp.x,PCp.y,PCp.z};
-	float fPCNextp[3]={PCNextp.x,PCNextp.y,PCNextp.z};
-	imgReadRaws.GetImageInfo()->ImageToWorld(fPp);
-	imgReadRaws.GetImageInfo()->ImageToWorld(fPCp);
-	imgReadRaws.GetImageInfo()->ImageToWorld(fPCNextp);
-	float fVec1[3]={fPp[0]-fPCp[0],fPp[1]-fPCp[1],fPp[2]-fPCp[2]};
-	float fVec2[3]={fPp[0]-fPCNextp[0],fPp[1]-fPCNextp[1],fPp[2]-fPCNextp[2]};
-	float fVec3[3]={fPCp[0]-fPCNextp[0],fPCp[1]-fPCNextp[1],fPCp[2]-fPCNextp[2]};
-	float fcosDing=zxh::VectorOP_Cosine(fVec1,fVec2,3);
-	float fcosDi1=zxh::VectorOP_Cosine(fVec1,fVec3,3);
-	float fcosDi2=zxh::VectorOP_Cosine(fVec2,fVec3,3);
-	float fNormDing=zxh::VectorOP_Magnitude(fVec1,3);
-	float fNormDi1=zxh::VectorOP_Magnitude(fVec2,3);
-	float fNormDi2=zxh::VectorOP_Magnitude(fVec3,3);
-	if (abs(fcosDing)<=0.960&&abs(fcosDi1)<=0.960&&abs(fcosDi2)<=0.960&&fNormDing<6&&fNormDi1<6&&fNormDi2<6)
-	{
-		return true;
-	}
-	else
-		return false;
-}
-bool DeteChlPonts_Tri(vector<PointCordTypeDef>vPParPLR,vector<PointCordTypeDef> vPChlPLR,zxhImageDataT<short>& imgReadRaws,const float consfMindist,PointCordTypeDef &PparPont,vector<PointCordTypeDef>&vPChlPont)
-{
-
-	vector<PointCordTypeDef> vPChldPont,vPChldOrderPont;
-	vPChldPont.clear();
-	vPChldOrderPont.clear();
-	PointCordTypeDef PPbP,PpbE,PpbNS;
-	for(int i=0;i<vPParPLR.size();i++)
-	{
-		PointCordTypeDef PpbP=vPParPLR[i];
-		for(int j=0;j<vPChlPLR.size()-1;j++)
-		{
-			PointCordTypeDef PCPont=vPChlPLR[j];
-			PointCordTypeDef PCNextPont=vPChlPLR[j+1];
-
-			if(IsNormTri(PpbP,PCPont,PCNextPont,imgReadRaws))
-			{
-				PPbP=PpbP;
-				vPChlPont.push_back(PCPont);
-				vPChlPont.push_back(PCNextPont);
-			}
-		}
-		if (vPChlPont.size()==2)//order left and right
-		{
-			if(vPChlPont[0].b<vPChlPont[1].b)
-			{
-				vPChldOrderPont.push_back(vPChlPont[0]);
-				vPChldOrderPont.push_back(vPChlPont[1]);
-			}
-			else
-			{
-				vPChldOrderPont.push_back(vPChlPont[1]);
-				vPChldOrderPont.push_back(vPChlPont[0]);
-			}
-			vPChlPont.clear();
-			vPChlPont.assign(vPChldOrderPont.begin(), vPChldOrderPont.end());  
-			PparPont=PpbP;
-			return true;
-		}
-		else
-		{
-			vPChlPont.clear();
-		}
-	}
-
-
-	return false;
-}
-bool EraseOvPonts(vector<PointCordTypeDef>&vPParPLR )//remove the overlap points
-{
-	vector<PointCordTypeDef> vPParPLRCopy,vPParNew;
-	vPParPLRCopy.assign(vPParPLR.begin(), vPParPLR.end());  
-	int nPosi;
-	int nnsize=vPParPLR.size();
-	int *nflag=new int[nnsize];
-	for(int i=0;i<nnsize;i++)
-	{
-		nflag[i] =0;
-	}
-	for(int i=0;i<vPParPLR.size();i++)
-	{
-		if (nflag[i]==1)
-		{
-			continue;
-		}
-		else
-		{
-			PointCordTypeDef PEndPonts=vPParPLR[i];
-			vPParNew.push_back(PEndPonts);
-			FindEndPinvParP1(PEndPonts,vPParPLRCopy,nflag);
-
-		}
-	}
-
-	delete[] nflag;
-	vPParPLR.clear();
-	vPParPLR.assign(vPParNew.begin(), vPParNew.end());  
-	return true;
-}
-bool InitPoint(PointCordTypeDef &Ppar)
-{
-	Ppar.b=0;
-	Ppar.x=0;
-	Ppar.y=0;
-	Ppar.z=0;
-	return true;
-}
-bool BackTrack(PointCordTypeDef PEndPont,vector<vector<PointCordTypeDef>>vvBraOrderPonts,vector<BraTypeDef>vBraParPonts,vector<BraTypeDef>vBraChlPonts,PointCordTypeDef PInitPont,vector<PointCordTypeDef> &vPBranch)
-{
-	int nBraNUM=PEndPont.b;
-	int nBraNUMInvvBra=0;//find the right branch
-	for(int nvvNUM=0;nvvNUM<vvBraOrderPonts.size();nvvNUM++)
-	{
-		vector<PointCordTypeDef> Pv=vvBraOrderPonts[nvvNUM];
-		int nPvBra=Pv[0].b;
-		if(nPvBra==nBraNUM)
-		{
-			nBraNUMInvvBra=nvvNUM;
-		}
-	}
-	vector<PointCordTypeDef> PLastv=vvBraOrderPonts[nBraNUMInvvBra];
-
-	PointCordTypeDef Ppar;
-	InitPoint(Ppar);
-	BraTypeDef BraCur,BraPar;
-	InitBra(BraCur,PInitPont);
-	InitBra(BraPar,PInitPont);
-	for(int i=PLastv.size()-1;i>=0;i--)//find the children points in children points vector
-	{
-		int nPosi;
-		PointCordTypeDef PCur=PLastv[i];
-		if(FindEndPinvParP(PCur,vBraChlPonts,nPosi))
-		{
-			BraCur=vBraChlPonts[nPosi];
-			vPBranch.push_back(PCur);
-			break;
-		}
-		vPBranch.push_back(PCur);
-	}
-	if(BraCur.parent.b!=0)
-	{
-		Ppar=BraCur.parent;
-		BackTrack(Ppar,vvBraOrderPonts,vBraParPonts,vBraChlPonts,PInitPont,vPBranch);
-	}
-	else
-	{
-		return false;
-	}
-}
-bool TransToWorld(vector<PointCordTypeDef> vPBranch,vector<PointCordTypeDef> &vPBranchWorld,zxhImageDataT<short>&imgReadRaws)
-{
-	vPBranchWorld.clear();
-	for(int i=vPBranch.size()-1;i>=0;i--)
-	{
-		float fp[3]={vPBranch[i].x,vPBranch[i].y,vPBranch[i].z};
-		imgReadRaws.GetImageInfo()->ImageToWorld(fp);
-		PointCordTypeDef pontWorld;
-		pontWorld.x=fp[0];
-		pontWorld.y=fp[1];
-		pontWorld.z=fp[2];
-		pontWorld.b=vPBranch[i].b;
-		vPBranchWorld.push_back(pontWorld);
 	}
 	return true;
 }
@@ -528,7 +267,29 @@ void WriteVtk(vector< PointCordTypeDef > PointCord, char* chFileName)
 	iVtkWriter->Write();
 }
 
-int main(int argc, char *argv[])
+
+void GetPathname(char *chFileName,string &strname)
+{  char path_buffer[_MAX_PATH];  
+char drive[_MAX_DRIVE];  
+char dir[_MAX_DIR];  
+char fname[_MAX_FNAME];  
+char ext[_MAX_EXT];  
+
+_splitpath( chFileName, drive, dir, fname, ext );  
+strname=fname;
+}
+void GetPathdir(char *chFileName,char *chdir)
+{  char path_buffer[_MAX_PATH];  
+char drive[_MAX_DRIVE];  
+char dir[_MAX_DIR];  
+char fname[_MAX_FNAME];  
+char ext[_MAX_EXT];  
+
+_splitpath( chFileName, drive, dir, fname, ext );  
+chdir=dir;
+}
+
+int main(int argc, char *argv[])//此程序用来排序从图像中读取的点，输出的是图像坐标
 {
 	//if( argc < 4 )
 	//{
@@ -541,8 +302,8 @@ int main(int argc, char *argv[])
 	//char *chResultName =argv[3];// "F:/Coronary_0/Coronary_Niessen/ProcessByLL/training/dataset00/vessel2/MCLine.nii.gz";
 	//string RorN=string(argv[4]);
 
-	string strFileNameRaw ="E:/work_jdq/CTA_data/RCAAEF/training_jdq/01/image01_R0_1.nii.gz";
-	char *chResFilefold ="K:/JDQ/CCTA_CAR/RCAA_32/training/dataset00";
+	char *strFileNameRaw ="E:/work_jdq/CTA_data/RCAAEF/training_jdq/01/image01_R0_1.nii.gz";
+	char *chResFilefold ="E:/work_jdq/CTA_data/RCAAEF/training_jdq/01/";
 
 
 	zxhImageDataT<short> imgReadRaws;
@@ -602,10 +363,13 @@ int main(int argc, char *argv[])
 				int nMinIndex=-1;
 				if(vPKPont.empty())
 					break;
-
+				float nP[3]={0,0,0};
+				PointCordTypeDef pmindstP;
 				for(int i=0;i<vPKPont.size();i++)//找出距离当前点最近的点
 				{
-					float nP[3]={vPKPont[i].x,vPKPont[i].y,vPKPont[i].z};
+					nP[0]=vPKPont[i].x;
+					nP[1]=vPKPont[i].y;
+					nP[2]=vPKPont[i].z;
 					float nPN[3]={PpbE.x,PpbE.y,PpbE.z};
 					imgReadRaws.GetImageInfo()->ImageToWorld(nP);
 					imgReadRaws.GetImageInfo()->ImageToWorld(nPN);
@@ -614,20 +378,39 @@ int main(int argc, char *argv[])
 					{
 						fMinDist=fDist;
 						nMinIndex=i;
+					
 					}
 				}
 
 				//保存找到的点，并从原始容器中移除
-				
-				PointCordTypeDef pmindstP;
-				pmindstP=vPKPont[nMinIndex];
-				pmindstP.b=fMinDist;
 				//cout<<"current point"<<PpbE.x<<","<<PpbE.y<<","<<PpbE.z<<" To-"<<endl;
-				cout<<pmindstP.x<<","<<pmindstP.y<<","<<pmindstP.z<<":"<<pmindstP.b<<endl;
+				//cout<<pmindstP.x<<","<<pmindstP.y<<","<<pmindstP.z<<":"<<pmindstP.b<<endl;
+					float nminP[3]={vPKPont[nMinIndex].x,vPKPont[nMinIndex].y,vPKPont[nMinIndex].z};
+					imgReadRaws.GetImageInfo()->ImageToWorld(nminP);
+					pmindstP.x=nminP[0];
+						pmindstP.y=nminP[1];
+						pmindstP.z=nminP[2];
+						pmindstP.b=fMinDist;
 				vOrderPonts.push_back(pmindstP);
+				PpbE=vPKPont[nMinIndex];
 				vPKPont.erase(vPKPont.begin()+nMinIndex);      
-				PpbE=pmindstP;
+				
 			}
+			//write to vtk
+			string strname="";
+			GetPathname(strFileNameRaw,strname);
+			string stRname = strname.substr(0, strname.length() - 4);
+			const char *chRname=stRname.c_str();
+			//if(strcmp(chext,".vtk")==0)// read vtk file
+
+			//	char chTemp[25];
+			int nFileLen = strlen(chResFilefold) + strlen("OrdP_")+strlen(chRname) + strlen(".txt") + 1;
+			char *chFileName = (char*)malloc(nFileLen);
+			strcpy(chFileName, chResFilefold);
+			strcat(chFileName, "OrdP_");
+			strcat(chFileName, chRname);
+			strcat(chFileName, ".txt");
+			WriteModCA2Txt(chFileName,vOrderPonts);
 
 }
 
