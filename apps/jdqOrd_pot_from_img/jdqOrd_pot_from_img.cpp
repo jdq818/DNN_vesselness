@@ -208,6 +208,20 @@ void WriteModCA2Txt(char *chFileName,vector<PointCordTypeDef>vPBr)
 	}	
 
 }
+void WriteCA2Txt_int(char *chFileName,vector<PointCordTypeDef>vPBr)
+{
+	ofstream WriteFileTxt(chFileName,ios::out);
+	int nPointNum = vPBr.size();
+
+	for (int i = 0; i < nPointNum; i++)
+	{
+		int nx=vPBr[i].x;
+		int ny=vPBr[i].y;
+		int nz=vPBr[i].z;
+		WriteFileTxt <<right<<fixed<<setfill('0')<<setprecision(0)<<nx<<' '<<ny<<' '<<nz<<'\n';
+	}	
+
+}
 bool GenBranch(vector<PointCordTypeDef> vPSEPont,vector<BraTypeDef>& vBraPonts)
 {
 	for(int nPSENUM=0;nPSENUM<vPSEPont.size();nPSENUM=nPSENUM+2)
@@ -290,21 +304,20 @@ chdir=dir;
 }
 
 int main(int argc, char *argv[])//此程序用来排序从图像中读取的点，输出的是图像坐标
-{
-	//if( argc < 4 )
-	//{
-	//	cerr << "Usage: " << endl;
-	//	cerr << "zxhcaeDMPMToNewImg.cpp	imageRaw(.nii)	imageResoRaw(.nii) MCLine(.vtk) ResultHigh-ResolutionName(.nii.gz) ResultLow-ResolutionName(.nii.gz)" << endl;
-	//	return -1;
-	//}
-	//string strFileNameRaw =string(argv[1]);//  "F:/Coronary_0/Coronary_Niessen/CoronaryMasks/DataMaskOutLung/mol_image00.nii";
-	//char *chFileName =argv[2];//"F:/Coronary_0/Coronary_Niessen/ProcessByLL/training/dataset00/vessel2/reference.vtk";
-	//char *chResultName =argv[3];// "F:/Coronary_0/Coronary_Niessen/ProcessByLL/training/dataset00/vessel2/MCLine.nii.gz";
-	//string RorN=string(argv[4]);
-
-	char *strFileNameRaw ="E:/work_jdq/CTA_data/RCAAEF/training_jdq/01/image01_R0_1.nii.gz";
-	char *chResFilefold ="E:/work_jdq/CTA_data/RCAAEF/training_jdq/01/";
-
+{  //release
+	if( argc < 2 )
+	{
+		cerr << "Usage: " << endl;
+		cerr << "jdqOrd_pot_from_img.cpp img.nii.gz resultfolder" << endl;
+		return -1;
+	}
+	char *strFileNameRaw =argv[1];
+	char *chResFilefold=argv[2];
+	//release
+	////debug
+	//char *strFileNameRaw ="E:/work_jdq/CTA_data/RCAAEF/training_jdq/01/image01_R0_1.nii.gz";
+	//char *chResFilefold ="E:/work_jdq/CTA_data/RCAAEF/training_jdq/01/";
+	////debug
 
 	zxhImageDataT<short> imgReadRaws;
 
@@ -335,9 +348,10 @@ int main(int argc, char *argv[])//此程序用来排序从图像中读取的点，输出的是图像坐
 					PKeyPont.z=nz;
 					PKeyPont.b=shInt;
 					vPKPont.push_back(PKeyPont);
-					if(nx==169&&ny==192&&nz==216)
+					if(shInt==1500)
 					{
 						PpbE=PKeyPont;
+						  cout << "Detect successfully: the starting point !" << endl;
 					}
 				}
 
@@ -348,7 +362,9 @@ int main(int argc, char *argv[])//此程序用来排序从图像中读取的点，输出的是图像坐
 			vLePo.push_back(PpbE);
 			//定义排序后点
 			vector<PointCordTypeDef>vOrderPonts;
+			vector<PointCordTypeDef>vOrderPontsImg;
 			vOrderPonts.clear();
+				vOrderPontsImg.clear();
 			//vOrderPonts.push_back(PpbE);
 			//找到离叶子节点距离最近的两个点
 			vector<float> vDist;
@@ -393,17 +409,18 @@ int main(int argc, char *argv[])//此程序用来排序从图像中读取的点，输出的是图像坐
 						pmindstP.b=fMinDist;
 				vOrderPonts.push_back(pmindstP);
 				PpbE=vPKPont[nMinIndex];
+				vOrderPontsImg.push_back(PpbE);
 				vPKPont.erase(vPKPont.begin()+nMinIndex);      
 				
 			}
-			//write to vtk
+			//write to txt
 			string strname="";
 			GetPathname(strFileNameRaw,strname);
 			string stRname = strname.substr(0, strname.length() - 4);
 			const char *chRname=stRname.c_str();
 			//if(strcmp(chext,".vtk")==0)// read vtk file
 
-			//	char chTemp[25];
+			//	保存世界坐标
 			int nFileLen = strlen(chResFilefold) + strlen("OrdP_")+strlen(chRname) + strlen(".txt") + 1;
 			char *chFileName = (char*)malloc(nFileLen);
 			strcpy(chFileName, chResFilefold);
@@ -411,6 +428,17 @@ int main(int argc, char *argv[])//此程序用来排序从图像中读取的点，输出的是图像坐
 			strcat(chFileName, chRname);
 			strcat(chFileName, ".txt");
 			WriteModCA2Txt(chFileName,vOrderPonts);
+		    cout << "Save successfully: ordered points (world) curve !" << endl;
+			//保存图像坐标
+						int nFileLen1 = strlen(chResFilefold) + strlen("OrdP_")+strlen(chRname)+strlen("_Img") + strlen(".txt") + 1;
+			char *chFileName1 = (char*)malloc(nFileLen1);
+			strcpy(chFileName1, chResFilefold);
+			strcat(chFileName1, "OrdP_");
+			strcat(chFileName1, chRname);
+			strcat(chFileName1, "_Img");
+			strcat(chFileName1, ".txt");
+			WriteCA2Txt_int(chFileName1,vOrderPontsImg);
+			cout << "Save successfully: ordered points (img) curve !" << endl;
 
 }
 

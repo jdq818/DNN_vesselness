@@ -1,0 +1,4 @@
+cd F:\fromJDQ\DFMcae_0213\github\DNN_vesselness_bin\bin\Release
+jdqOrd_pot_from_img E:/work_jdq/CTA_data/RCAAEF/training_jdq/01/image01_R0_1.nii.gz  E:/work_jdq/CTA_data/RCAAEF/training_jdq/01/
+jdqBesselCurve E:/work_jdq/CTA_data/RCAAEF/training_jdq/01/OrdP_image01_R0_1.txt E:/work_jdq/CTA_data/RCAAEF/training_jdq/01/Bess_image01_R0_1
+
