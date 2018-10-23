@@ -182,7 +182,10 @@ void WriteTxt(vector< PointCordTypeDef > PointCord, char* chFileName)
 	float fImgPixel[3];	
 	for (int i = 0; i < nPointNum; i++)
 	{
-		WriteFileTxt <<right<<fixed<<setfill('4')<<setprecision(4)<<PointCord[i].x<<' '<<PointCord[i].y<<' '<<PointCord[i].z<<'\n';
+		float fx=-1*PointCord[i].x;
+		float fy=-1*PointCord[i].y;
+		float fz=PointCord[i].z;
+		WriteFileTxt <<right<<fixed<<setfill('4')<<setprecision(4)<<fx<<' '<<fy<<' '<<fz<<'\n';
 	}	
 }
 void WriteCAIntTxt(vector<short> sMolPontInts,char* chFileName)

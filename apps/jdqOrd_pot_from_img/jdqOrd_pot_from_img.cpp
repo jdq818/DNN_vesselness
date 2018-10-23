@@ -334,6 +334,7 @@ int main(int argc, char *argv[])//此程序用来排序从图像中读取的点，输出的是图像坐
 
 	imgReadRaws.GetImageSize(nsx,nsy,nsz,nst);
 	PointCordTypeDef PpbE;
+	PpbE.b=-1500;
 	//store the manul segment points
 	for(int nx=0;nx<nsx;nx++)
 		for(int ny=0;ny<nsy;ny++)
@@ -351,10 +352,21 @@ int main(int argc, char *argv[])//此程序用来排序从图像中读取的点，输出的是图像坐
 					if(shInt==1500)
 					{
 						PpbE=PKeyPont;
-						  cout << "Detect successfully: the starting point !" << endl;
+
+						  cout << "Detect successfully: the left ostia !" << endl;
+					}
+					else if(shInt==1400)
+					{
+						PpbE=PKeyPont;
+						  cout << "Detect successfully: the right ostia !" << endl;
 					}
 				}
 
+			}
+			if (PpbE.b==-1500)
+			{
+				std::cerr << "You should check the ostia!"; 
+		           return -1;
 			}
 			//定义叶子点
 			vector<PointCordTypeDef> vLePo;
@@ -401,6 +413,15 @@ int main(int argc, char *argv[])//此程序用来排序从图像中读取的点，输出的是图像坐
 				//保存找到的点，并从原始容器中移除
 				//cout<<"current point"<<PpbE.x<<","<<PpbE.y<<","<<PpbE.z<<" To-"<<endl;
 				//cout<<pmindstP.x<<","<<pmindstP.y<<","<<pmindstP.z<<":"<<pmindstP.b<<endl;
+				if( fMinDist>8)
+				{
+			    cout<<"current point"<<PpbE.x<<","<<PpbE.y<<","<<PpbE.z<<" To-"<<endl;
+				cout<<vPKPont[nMinIndex].x<<","<<vPKPont[nMinIndex].y<<","<<vPKPont[nMinIndex].z<<":"<<fMinDist<<endl;
+					std::cerr << "You should check the manual selected points!"; 
+		           return -1;
+				}
+		
+
 					float nminP[3]={vPKPont[nMinIndex].x,vPKPont[nMinIndex].y,vPKPont[nMinIndex].z};
 					imgReadRaws.GetImageInfo()->ImageToWorld(nminP);
 					pmindstP.x=nminP[0];
@@ -430,12 +451,11 @@ int main(int argc, char *argv[])//此程序用来排序从图像中读取的点，输出的是图像坐
 			WriteModCA2Txt(chFileName,vOrderPonts);
 		    cout << "Save successfully: ordered points (world) curve !" << endl;
 			//保存图像坐标
-						int nFileLen1 = strlen(chResFilefold) + strlen("OrdP_")+strlen(chRname)+strlen("_Img") + strlen(".txt") + 1;
+						int nFileLen1 = strlen(chResFilefold) + strlen("OrdPimg_")+strlen(chRname)+strlen(".txt") + 1;
 			char *chFileName1 = (char*)malloc(nFileLen1);
 			strcpy(chFileName1, chResFilefold);
-			strcat(chFileName1, "OrdP_");
+			strcat(chFileName1, "OrdPimg_");
 			strcat(chFileName1, chRname);
-			strcat(chFileName1, "_Img");
 			strcat(chFileName1, ".txt");
 			WriteCA2Txt_int(chFileName1,vOrderPontsImg);
 			cout << "Save successfully: ordered points (img) curve !" << endl;
