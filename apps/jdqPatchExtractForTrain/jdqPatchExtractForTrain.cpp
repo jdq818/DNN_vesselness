@@ -96,6 +96,9 @@ Version:   $Revision: 2.2.1 $
 #include <stdio.h>
 #include <stdlib.h>
 #include <algorithm>
+#include <sstream>
+
+
 
 #include "zxhImageGipl.h" 
 #include "zxhImageData.h"
@@ -116,6 +119,12 @@ typedef struct
 	float y;
 	float z;
 }PointCordTypeDef;
+string num2str(double i)
+{
+	stringstream ss;
+	ss<<i;
+	return ss.str();
+}
 bool Calc_divec(int i,float fdivec[3],vector<PointCordTypeDef> &ref,float clSampling)
 {
 
@@ -213,7 +222,7 @@ int CalculatePatchsize(zxhImageData &IntensityImage,std::vector<jdq2017::point3D
 	for (int i=0;i<vcurveponts.size();i++)
 	{
 		float curvpointsWolrd[] = { vcurveponts[i]._x,  vcurveponts[i]._y,  vcurveponts[i]._z, 0 };
-		IntensityImage.GetImageInfo()->WorldToImage(curvpointsWolrd);//物理坐标转成图像坐标
+		IntensityImage.GetImageInfo()->WorldToImage(curvpointsWolrd);//
 		int scx = zxh::round(curvpointsWolrd[0]);
 		int scy = zxh::round(curvpointsWolrd[1]);
 		int scz = zxh::round(curvpointsWolrd[2]);
@@ -238,7 +247,36 @@ int CalculatePatchsize(zxhImageData &IntensityImage,std::vector<jdq2017::point3D
 			n++;
 		}
 	}
+	delete[]shMask;
 	return n;
+}
+bool Calc3vectorsFromTangetVecAndPoints2(float  fdivec1[3],float  fPointWord[3],float fdivec[3][3])
+{
+	float Ia=fdivec1[0];
+	float Ib=fdivec1[1];
+	float Ic=fdivec1[2];
+	float InputWorldCoord_x=fPointWord[0];
+	float InputWorldCoord_y=fPointWord[1];
+	float InputWorldCoord_z=fPointWord[2];
+	float ttt;
+	ttt = -(InputWorldCoord_y*Ia + InputWorldCoord_y*Ib + InputWorldCoord_z*Ic);
+	float ta = -InputWorldCoord_x - ttt*Ia;
+	float tb = -InputWorldCoord_y - ttt*Ib;
+	float tc = -InputWorldCoord_z - ttt*Ic;
+	float tna = ta / (sqrt(ta*ta + tb*tb + tc*tc) + ZXH_FloatInfinitesimal);
+	float tnb = tb / (sqrt(ta*ta + tb*tb + tc*tc) + ZXH_FloatInfinitesimal);
+	float tnc = tc / (sqrt(ta*ta + tb*tb + tc*tc) + ZXH_FloatInfinitesimal);
+	float tva = Ib*tnc - Ic*tnb;
+	float tvb = Ic*tna - Ia*tnc;
+	float tvc = Ia*tnb - Ib*tna;
+	float vA[]={tna,tnb,tnc}, vB[]={tva,tvb,tvc}, vC[]={Ia,Ib,Ic};
+	zxh::VectorOP_Normalise(vA,3);
+	zxh::VectorOP_Normalise(vB,3);
+	zxh::VectorOP_Normalise(vC,3);
+	fdivec[0][0]=Ia;fdivec[0][1]=Ib;fdivec[0][2]=Ic;
+	fdivec[1][0]=tva;fdivec[1][1]=tvb;fdivec[1][2]=tvc;
+	fdivec[2][0]=tna;fdivec[2][1]=tnb;fdivec[2][2]=tnc;
+	return true;
 }
 bool Calc3vectorsFromTangetVecAndPoints(float  fdivec1[3],float  fPointWord[3],float fdivec[3][3])
 {
@@ -255,11 +293,12 @@ bool Calc3vectorsFromTangetVecAndPoints(float  fdivec1[3],float  fPointWord[3],f
 	zxh::VectorOP_Normalise(fdivec3,3);
 	zxh::VectorOP_Normalise(fdivec2,3);
 	zxh::VectorOP_Normalise(fdivec1,3) ;
-	float x1=zxh::absf(zxh::VectorOP_Cosine(fdivec1,fdivec2,2));
+	float x1=zxh::absf(zxh::VectorOP_Cosine(fdivec1,fdivec2,3));
 	float x2=zxh::absf(zxh::VectorOP_Cosine(fdivec1,fdivec2,3));
-	float x3=zxh::absf(zxh::VectorOP_Cosine(fdivec2,fdivec2,3));
-	if( zxh::absf(zxh::VectorOP_Cosine(fdivec1,fdivec2,3))>1.0e-3 ||zxh::absf(zxh::VectorOP_Cosine(fdivec1,fdivec3,3))>1.0e-3 ||zxh::absf(zxh::VectorOP_Cosine(fdivec1,fdivec2,3))>1.0e-3 )
+	float x3=zxh::absf(zxh::VectorOP_Cosine(fdivec2,fdivec3,3));
+	if( zxh::absf(zxh::VectorOP_Cosine(fdivec1,fdivec2,3))>1.0e-3 ||zxh::absf(zxh::VectorOP_Cosine(fdivec1,fdivec3,3))>1.0e-3 ||zxh::absf(zxh::VectorOP_Cosine(fdivec2,fdivec3,3))>1.0e-3 )
 	{
+		std::cerr<<"x1: "<<x1<< "x2: "<<x2<<"x3: "<<x3<<endl;
 		std::cerr<<"error: axises should be perpendicular\n";
 		return false ;
 	}
@@ -280,8 +319,12 @@ bool Calc3vectorsFromTangetVecAndPoints(float  fdivec1[3],float  fPointWord[3],f
 	fdivec[2][1]=fdivec3[1];
 	fdivec[2][2]=fdivec3[2];
 }
-bool LGeneratePatchExtractByWorldWithRandOffset(int PatchNumIdex,float fdivec[3][3],float InputOutputWorldCoord[], int PatchSize[],zxhImageData &IntensityImage,zxhImageData &PatchImage)
+//这个函数是用来生成沿着中心线切向取patch
+bool LGeneratePatchExtractByWorldWithRandOffset(int PatchNumIdex,float fdivec[3][3],float InputOutputWorldCoord[], int PatchSize[],zxhImageData &IntensityImage,zxhImageData* PatchImageArray[3])
 {
+	zxhImageData *PatchImage1 = PatchImageArray[0];
+	zxhImageData *PatchImage2 = PatchImageArray[1];
+	zxhImageData *PatchImage3 = PatchImageArray[2];
 
 	int N = PatchSize[0];
 	int HalfPatchLength = PatchSize[1]; 
@@ -293,22 +336,150 @@ bool LGeneratePatchExtractByWorldWithRandOffset(int PatchNumIdex,float fdivec[3]
 	//Interpolation
 	zxhImageModelingLinear InterpolationMod;
 	InterpolationMod.SetImage(&IntensityImage);
-	for (int i = -N; i < N + 1; i++)
+	for(int s=1;s<4;s++)
 	{
-		for (int j = -N; j < N + 1; j++)
+		int sN=s*N;
+		int sHalfPatchLength=s*HalfPatchLength;
+		for (int i = -sN; i < sN + 1; i=i+s)
 		{
-			for (int k = -HalfPatchLength; k < HalfPatchLength + 1; k++)//extend the patch along the gradient orientation
-			{ 
-				PatchPointWorldCoord[0] =InputOutputWorldCoord[0] + i*fdivec[0][0] + j*fdivec[1][0] + k*fdivec[2][0];
-				PatchPointWorldCoord[1] = InputOutputWorldCoord[1] + i*fdivec[0][1] + j*fdivec[1][1] + k*fdivec[2][1];
-				PatchPointWorldCoord[2] =InputOutputWorldCoord[2]+  i*fdivec[0][2] + j*fdivec[1][2] + k*fdivec[2][2];
+			for (int j = -sN; j < sN + 1; j=j+s)
+			{
+				for (int k = -sHalfPatchLength; k < sHalfPatchLength + 1;k=k+s)//extend the patch along the gradient orientation
+				{ 
+					PatchPointWorldCoord[0] =InputOutputWorldCoord[0] + i*fdivec[0][0] + j*fdivec[1][0] + k*fdivec[2][0];
+					PatchPointWorldCoord[1] = InputOutputWorldCoord[1] + i*fdivec[0][1] + j*fdivec[1][1] + k*fdivec[2][1];
+					PatchPointWorldCoord[2] =InputOutputWorldCoord[2]+  i*fdivec[0][2] + j*fdivec[1][2] + k*fdivec[2][2];
+					zxhImageData *PatchImage=PatchImageArray[s-1];
+					//InterpolationMod.SetImage(pLALabel);//check the orientation of gradient				
+					float IntensityValue = InterpolationMod.GetPixelFloatValueWithCheckByWorld(PatchPointWorldCoord[0], PatchPointWorldCoord[1], PatchPointWorldCoord[2], 0);
 
-				//InterpolationMod.SetImage(pLALabel);//check the orientation of gradient				
-				float IntensityValue = InterpolationMod.GetPixelFloatValueWithCheckByWorld(PatchPointWorldCoord[0], PatchPointWorldCoord[1], PatchPointWorldCoord[2], 0);
+					int W2I_Coor_SetPatchPixel = (i/s + N) + (j/s + N) * (2 * N + 1) + (k/s + HalfPatchLength)* (2 * N + 1)* (2 * N + 1);
 
-				int W2I_Coor_SetPatchPixel = (i + N) + (j + N) * (2 * N + 1) + (k + HalfPatchLength)* (2 * N + 1)* (2 * N + 1);
-				PatchImage.SetPixelByGreyscale(W2I_Coor_SetPatchPixel, PatchNumIdex, 0, 0, IntensityValue);
+					PatchImage->SetPixelByGreyscale(W2I_Coor_SetPatchPixel, PatchNumIdex, 0, 0, IntensityValue);
 
+				}
+			}
+		}
+	}
+
+	return true ;
+
+}
+//以下这个函数是在x, y, z三个方向取patch
+bool LGeneratePatchExtractByWorldWithRandOffset_inxyzTrain(int PatchNumIdex,float fdivec[3][3],float InputOutputWorldCoord[], int PatchSize[],zxhImageData &IntensityImage,zxhImageData* PatchImageArray[3])
+{
+	//z方向
+	fdivec[0][0]=0;
+	fdivec[0][1]=0;
+	fdivec[0][2]=1;
+
+	//y方向
+	fdivec[1][0]=0;
+	fdivec[1][1]=1;
+	fdivec[1][2]=0;
+
+	//x方向
+	fdivec[2][0]=1;
+	fdivec[2][1]=0;
+	fdivec[2][2]=0;
+
+	zxhImageData *PatchImage1 = PatchImageArray[0];
+	zxhImageData *PatchImage2 = PatchImageArray[1];
+	zxhImageData *PatchImage3 = PatchImageArray[2];
+
+	int N = PatchSize[0];
+	int HalfPatchLength = PatchSize[1]; 
+
+
+
+	int PatchPointWorldCoord[3] = { 0 };
+	//Computing the intensity of points in the tangent plane using interpolation	
+	//Interpolation
+	zxhImageModelingLinear InterpolationMod;
+	InterpolationMod.SetImage(&IntensityImage);
+	for(int s=1;s<4;s++)
+	{
+		int sN=s*N;
+		int sHalfPatchLength=s*HalfPatchLength;
+		for (int i = -sN; i < sN + 1; i=i+s)
+		{
+			for (int j = -sN; j < sN + 1; j=j+s)
+			{
+				for (int k = -sHalfPatchLength; k < sHalfPatchLength + 1;k=k+s)//extend the patch along the gradient orientation
+				{ 
+					PatchPointWorldCoord[0] =InputOutputWorldCoord[0] + i*fdivec[0][0] + j*fdivec[1][0] + k*fdivec[2][0];
+					PatchPointWorldCoord[1] = InputOutputWorldCoord[1] + i*fdivec[0][1] + j*fdivec[1][1] + k*fdivec[2][1];
+					PatchPointWorldCoord[2] =InputOutputWorldCoord[2]+  i*fdivec[0][2] + j*fdivec[1][2] + k*fdivec[2][2];
+					zxhImageData *PatchImage=PatchImageArray[s-1];
+					//InterpolationMod.SetImage(pLALabel);//check the orientation of gradient				
+					float IntensityValue = InterpolationMod.GetPixelFloatValueWithCheckByWorld(PatchPointWorldCoord[0], PatchPointWorldCoord[1], PatchPointWorldCoord[2], 0);
+
+					int W2I_Coor_SetPatchPixel = (i/s + N) + (j/s + N) * (2 * N + 1) + (k/s + HalfPatchLength)* (2 * N + 1)* (2 * N + 1);
+
+					PatchImage->SetPixelByGreyscale(W2I_Coor_SetPatchPixel, PatchNumIdex, 0, 0, IntensityValue);
+
+				}
+			}
+		}
+	}
+
+	return true ;
+
+}
+//以下这个函数是在x, y, z三个方向取patch
+bool LGeneratePatchExtractByWorldWithRandOffset_inxyzTest(int PatchNumIdex,float fdivec[3][3],float InputOutputWorldCoord[], int PatchSize[],zxhImageData &IntensityImage,zxhImageData* PatchImageArray[3])
+{
+	//z方向
+	fdivec[0][0]=0;
+	fdivec[0][1]=0;
+	fdivec[0][2]=1;
+
+	//y方向
+	fdivec[1][0]=0;
+	fdivec[1][1]=1;
+	fdivec[1][2]=0;
+
+	//x方向
+	fdivec[2][0]=1;
+	fdivec[2][1]=0;
+	fdivec[2][2]=0;
+
+	zxhImageData *PatchImage1 = PatchImageArray[0];
+	zxhImageData *PatchImage2 = PatchImageArray[1];
+	zxhImageData *PatchImage3 = PatchImageArray[2];
+
+	int N = PatchSize[0];
+	int HalfPatchLength = PatchSize[1]; 
+
+
+
+	int PatchPointWorldCoord[3] = { 0 };
+	//Computing the intensity of points in the tangent plane using interpolation	
+	//Interpolation
+	zxhImageModelingLinear InterpolationMod;
+	InterpolationMod.SetImage(&IntensityImage);
+	for(int s=1;s<2;s++)
+	{
+		int sN=s*N;
+		int sHalfPatchLength=s*HalfPatchLength;
+		for (int i = -sN; i < sN + 1; i=i+s)
+		{
+			for (int j = -sN; j < sN + 1; j=j+s)
+			{
+				for (int k = -sHalfPatchLength; k < sHalfPatchLength + 1;k=k+s)//extend the patch along the gradient orientation
+				{ 
+					PatchPointWorldCoord[0] =InputOutputWorldCoord[0] + i*fdivec[0][0] + j*fdivec[1][0] + k*fdivec[2][0];
+					PatchPointWorldCoord[1] = InputOutputWorldCoord[1] + i*fdivec[0][1] + j*fdivec[1][1] + k*fdivec[2][1];
+					PatchPointWorldCoord[2] =InputOutputWorldCoord[2]+  i*fdivec[0][2] + j*fdivec[1][2] + k*fdivec[2][2];
+					zxhImageData *PatchImage=PatchImageArray[s-1];
+					//InterpolationMod.SetImage(pLALabel);//check the orientation of gradient				
+					float IntensityValue = InterpolationMod.GetPixelFloatValueWithCheckByWorld(PatchPointWorldCoord[0], PatchPointWorldCoord[1], PatchPointWorldCoord[2], 0);
+
+					int W2I_Coor_SetPatchPixel = (i/s + N) + (j/s + N) * (2 * N + 1) + (k/s + HalfPatchLength)* (2 * N + 1)* (2 * N + 1);
+
+					PatchImage->SetPixelByGreyscale(W2I_Coor_SetPatchPixel, PatchNumIdex, 0, 0, IntensityValue);
+
+				}
 			}
 		}
 	}
@@ -317,26 +488,35 @@ bool LGeneratePatchExtractByWorldWithRandOffset(int PatchNumIdex,float fdivec[3]
 
 }
 
-
 int main(int argc, char *argv[])
 {
 	//if( argc < 5 )
 	//{
 	//	cerr << "Usage: " << endl;
-	//	cerr << "jdqPatchExtractForTrain.cpp	imageRaw(.nii)	labelimage.nii Line or points(.vtk) results -NorR" << endl;
+	//	cerr << "jdqPatchExtractForTrain	curve	image  labimag pathinfor " << endl;
 	//	return -1;
 	//}
 
+	//string strCurvename =string(argv[1]);
+	//string strintImg =string(argv[2]);
+	//string strlabImg =string(argv[3]);
+	//string SavePathname = string(argv[4]);  
+	//string trainortest = string(argv[5]);  
 
+	string strCurvename ="J:/work_jdq/data_DNN/wholedata/RCAAEF_32/dataset24/centerlines/vessel0.txt";
+	string strintImg ="J:/work_jdq/data_DNN/wholedata/RCAAEF_32/dataset24/image/image.nii.gz";
+	string strlabImg ="J:/work_jdq/data_DNN/wholedata/RCAAEF_32/dataset24/image/lab_image.nii.gz";
+	string SavePathname = "J:/work_jdq/infiles/data_DNN/RCAAEF_32/dataset24/Patch/";  
+	string trainortest = "-test2";  
 	//输入一条曲线，一个intensity image和 一个label image
-	string mainfold="E:\\work_jdq\\DL_train\\ForDNNvsls\\dataset00\\";
-	string strCurvename =mainfold+"centerlines\\vessel0.txt";
-	string strintImg =mainfold + "image\\image.nii.gz";
-	string strlabImg =mainfold + "image\\lab_image.nii.gz";
-	string strResultfold =mainfold;
+	////string mainfold="E:\\work_jdq\\DL_train\\ForDNNvsls\\dataset00\\";
+	////string strCurvename =mainfold+"centerlines\\vessel0.txt";
+	////string strintImg =mainfold + "image\\image.nii.gz";
+	////string strlabImg =mainfold + "image\\lab_image.nii.gz";
+	////string strResultfold =mainfold;
 
-	string SavePatchinfo = mainfold + "Patch_info.txt";  
-	string Str_T = mainfold + "Patch.nii.gz";
+	////string SavePatchinfo = mainfold + "Patch_info.txt";  
+
 
 	//---------------相关参数设置---------------
 	int HalfPatchLength = 2;
@@ -348,192 +528,516 @@ int main(int argc, char *argv[])
 	//char * bufferTscar=new char[1048576], * bufferTnormal=new char[1048576], *bufferNlink=new char[1048576] ;
 	int SiglePatchSize = (N * 2 + 1)*(N * 2 + 1)*(HalfPatchLength * 2 + 1);
 	//---------------读取图像---------------------------
-	zxhImageDataT<short> IntensityImage, LabelImage, PatchImage;
+	zxhImageDataT<short> IntensityImage, LabelImage;
+
 
 	//读取intensity image
 	zxh::OpenImageSafe(&IntensityImage,strintImg);
 	//读取label image
 	zxh::OpenImageSafe(&LabelImage,strlabImg);
-	//---------------读取中心线,并resample---------------------------
 
-	std::vector<jdq2017::point3D>vcurveponts;
-	vcurveponts.clear();
-	ReadCurve(strCurvename,vcurveponts);
+	vector<PointCordTypeDef> vPointCord;//patch的中心点
 
-	//
-	cout<<"Resample the curve by image spacing!"<<endl;
-	float fImgSpacing[]={1,1,1,1};//Add by JDQ
-	IntensityImage.GetImageSpacing(fImgSpacing[0],fImgSpacing[1],fImgSpacing[2],fImgSpacing[3] );//Add by JDQ
-	float fresamle=zxh::minf(fImgSpacing[1],fImgSpacing[2])*0.5;
-	cout<<"Old curve points: "<<vcurveponts.size()-1<<endl;
-	ResampleCurve(vcurveponts,fresamle);
-	cout<<"New curve points: "<<vcurveponts.size()-1<<endl;
-	//-----------生成 Patch Image ----------------------
-	//计算patch的数量；size(patch)=size(imagepoints(vcurveponts))
-
-	std::vector<jdq2017::point3D>vponts;
-	vponts.clear();
-	int nptsize=CalculatePatchsize(IntensityImage,vcurveponts,vponts);
-	vector<PointCordTypeDef> vPointCord;
-	for (int i = 0; i < vponts.size(); i++)
-	{
-		PointCordTypeDef TempPoint;
-		TempPoint.x =vponts[i]._x;
-		TempPoint.y =vponts[i]._y;
-		TempPoint.z =vponts[i]._z;
-		vPointCord.push_back(TempPoint);
-	}
-	float spacing111[] = { 1, 1, 1, 1 }; 
-	ofstream outfile_norm(SavePatchinfo, ios::beg);//output
-	outfile_norm << nptsize << "\n";
-	//定义patch library的size
-
-	int P_newsize[] = { SiglePatchSize, 4*nptsize, 1, 1 };
-	PatchImage.NewImage(2, P_newsize, spacing111, IntensityImage.GetImageInfo());
-	zxhImageData* ImageArray[4] = { &IntensityImage, &LabelImage, &PatchImage };
-	//定义一个mask，避免重复取点
 	int PatchInfo[4] = { N, HalfPatchLength, 0, 0 };
-
-	for(int ptid=0;ptid<vPointCord.size();ptid++)
+	float spacing111[] = { 1, 1, 1, 1 }; 
+	//---------------如果是Train数据,
+	//-----------------读取中心线,并resample---------------------------
+	if (strcmp(trainortest.c_str(),"-train")==0)
 	{
-		if(ptid==157)
-			int xxx=0;
-		//-------------------Center--------------------
-		//获取当前点的patch
-		float InputWorldCoord[4] ={ vPointCord[ptid].x,  vPointCord[ptid].y,  vPointCord[ptid].z, 0 };
-		float inputimagecoord[4]={ vPointCord[ptid].x,  vPointCord[ptid].y,  vPointCord[ptid].z, 0 };
-		LabelImage.GetImageInfo()->WorldToImage(inputimagecoord);
-		int scx = zxh::round(inputimagecoord[0]);
-		int scy = zxh::round(inputimagecoord[1]);
-		int scz = zxh::round(inputimagecoord[2]);
-		float finten=LabelImage.GetPixelGreyscale(scx,scy,scz,0);
+		cout<<"train"<<endl;
+		string SavePatchinfo=SavePathname+"Patch.txt";
+		ofstream outfile_norm(SavePatchinfo, ios::beg);//output
 
-		float fdivec[3][3]={0};//{fdivec[0][0],fdivec[0][1],fdivec[0][2]}是切线方向
-		float ftdivec[3]={0};
-		//计算切向量（第一个向量）
+		std::vector<jdq2017::point3D>vcurveponts;
+		vcurveponts.clear();
+		ReadCurve(strCurvename,vcurveponts);
 
-		Calc_divec(ptid,ftdivec,vPointCord,fresamle);
-		if (zxh::VectorOP_Magnitude(ftdivec,3) <ZXH_FloatInfinitesimal)
-		{
-			std::cout << "error: magnitude too small for node " << ptid << "\n";
-			return false ;
-		}
-		//通过切向量和通过点计算其他两个相互垂直的向量
-		Calc3vectorsFromTangetVecAndPoints(ftdivec,InputWorldCoord, fdivec);
-		if (LGeneratePatchExtractByWorldWithRandOffset(PatchNumIdex,fdivec,InputWorldCoord, PatchInfo,IntensityImage, PatchImage) == false)
-		{
-			continue;//
-
-		}
-		//-------------------附近三个点--------------------
-		short labnum[4]={-1,-1,-1,-1};
-		labnum[1]=1;
-		int numNP=1;
-		PatchNumIdex++;
-		outfile_norm << PatchNumIdex << " " <<2<< "\n";//金标
-		//法平面随机取点，直到取出三个点，都是不同的label值，如2，3，0；
-		srand((unsigned)time(NULL));  
-
-
-		while(PatchNumIdex<3000)
-		{
-
-		float randoffset1 = float((rand() % (200 * Offset))) / 100.0;	
-		float randoffset2 = float((rand() % (200 * Offset))) / 100.0;	
-
-		float fvec1[3]={randoffset1*fdivec[1][0],randoffset1*fdivec[1][1],randoffset1*fdivec[1][2]};
-		float fvec2[3]={randoffset2*fdivec[2][0],randoffset2*fdivec[2][1],randoffset2*fdivec[2][2]};
-		float fsumvec[3]={fvec1[0]+fvec2[0],fvec1[1]+fvec2[1],fvec1[2]+fvec2[2]};
-
-		//Rand shift
-		zxh::VectorOP_Normalise(fsumvec,3);
-		float randradius= float((rand() % (200 * Offset))) / 100.0;
-
-		float InputWorldCoord_x = InputWorldCoord[0] + randradius*fsumvec[0];
-		float InputWorldCoord_y = InputWorldCoord[1] + randradius*fsumvec[1];
-		float InputWorldCoord_z = InputWorldCoord[2] + randradius*fsumvec[2];
 		//
-		//
+		cout<<"Resample the curve by image spacing!"<<endl;
+		float fImgSpacing[]={1,1,1,1};//Add by JDQ
+		IntensityImage.GetImageSpacing(fImgSpacing[0],fImgSpacing[1],fImgSpacing[2],fImgSpacing[3] );//Add by JDQ
+		float fresamle=zxh::minf(fImgSpacing[1],fImgSpacing[2])*0.5;
+		cout<<"Old curve points: "<<vcurveponts.size()-1<<endl;
+		ResampleCurve(vcurveponts,fresamle);
+		cout<<"New curve points: "<<vcurveponts.size()-1<<endl;
 
-		float InputNeiPWorldCoord[4]={InputWorldCoord_x,InputWorldCoord_y,InputWorldCoord_y,0};
-		//cout<< "warning: radius"<<randradius <<endl;
-		//
-		float InputNeiNodeWorldCoord[4]={InputWorldCoord_x,InputWorldCoord_y,InputWorldCoord_z,0 };
-		IntensityImage.GetImageInfo()->WorldToImage(InputNeiNodeWorldCoord);
-		int nscx = zxh::round(InputNeiNodeWorldCoord[0]);
-		int nscy = zxh::round(InputNeiNodeWorldCoord[1]);
-		int nscz = zxh::round(InputNeiNodeWorldCoord[2]);
+		//-----------生成 Patch Image ----------------------
+		zxhImageDataT<short> PatchImage1,PatchImage2,PatchImage3;
+		//计算patch的数量；size(patch)=size(imagepoints(vcurveponts))
 
-		bool bIsInsideImage = IntensityImage.InsideImage(nscx, nscy, nscz, 0); // 超过图像边界的，不给予考虑，也就是说，默认为normal myo
-		if (!bIsInsideImage)
+		std::vector<jdq2017::point3D>vponts;
+		vponts.clear();
+		int nptsize=CalculatePatchsize(IntensityImage,vcurveponts,vponts);
+
+		for (int i = 0; i < vponts.size(); i++)
 		{
-			std::cout << "warning: niebour node of point"<< ptid<< "is not inside image " << "\n"; //-----------------
-			continue;
-		}
-		short shlabnum=LabelImage.GetPixelGreyscale(nscx, nscy, nscz, 0);
-		bool bexitlab=false;
-		for (int k=0;k<4;k++)
-		{
-			int ndinten=labnum[k];
-			if (ndinten==shlabnum)
-			{
-				bexitlab=true;
-				break;
-			}
+
+			PointCordTypeDef TempPoint;
+			TempPoint.x =vponts[i]._x;
+			TempPoint.y =vponts[i]._y;
+			TempPoint.z =vponts[i]._z;
+			vPointCord.push_back(TempPoint);
 		}
 
-		if(bexitlab)
-		{
-			continue;
-		}
-		else
-		{
-			//计算取patch主方向
-			float fNormsumvec[3]={fsumvec[0],fsumvec[1],fsumvec[2],};
-			zxh::VectorOP_Normalise(fNormsumvec,3);
 
-			if (zxh::VectorOP_Magnitude(fNormsumvec,3) <ZXH_FloatInfinitesimal)
+		outfile_norm << 4*nptsize<<" "<<0<< "\n";
+		//定义patch library的size
+
+		int P_newsize[] = { SiglePatchSize, 4*nptsize, 1, 1 };
+		PatchImage1.NewImage(2, P_newsize, spacing111, IntensityImage.GetImageInfo());
+		PatchImage2.NewImage(2, P_newsize, spacing111, IntensityImage.GetImageInfo());
+		PatchImage3.NewImage(2, P_newsize, spacing111, IntensityImage.GetImageInfo());
+		zxhImageData* ImageArray[2] = { &IntensityImage, &LabelImage };
+		zxhImageData* PatchImageArray[3]={&PatchImage1,&PatchImage2,&PatchImage3};
+		for(int ptid=0;ptid<vPointCord.size();ptid++)
+		{
+			if(ptid==157)
+				int xxx=0;
+			//-------------------Center--------------------
+			//获取当前点的patch
+			float InputWorldCoord[4] ={ vPointCord[ptid].x,  vPointCord[ptid].y,  vPointCord[ptid].z, 0 };
+			float inputimagecoord[4]={ vPointCord[ptid].x,  vPointCord[ptid].y,  vPointCord[ptid].z, 0 };
+			LabelImage.GetImageInfo()->WorldToImage(inputimagecoord);
+			int scx = zxh::round(inputimagecoord[0]);
+			int scy = zxh::round(inputimagecoord[1]);
+			int scz = zxh::round(inputimagecoord[2]);
+			float finten=LabelImage.GetPixelGreyscale(scx,scy,scz,0);
+
+			float fdivec[3][3]={0};//{fdivec[0][0],fdivec[0][1],fdivec[0][2]}是切线方向
+			float ftdivec[3]={0};
+			//计算切向量（第一个向量）
+
+			Calc_divec(ptid,ftdivec,vPointCord,fresamle);
+			if (zxh::VectorOP_Magnitude(ftdivec,3) <ZXH_FloatInfinitesimal)
 			{
 				std::cout << "error: magnitude too small for node " << ptid << "\n";
 				return false ;
 			}
 			//通过切向量和通过点计算其他两个相互垂直的向量
-			float fdivecN[3][3]={0};
-			Calc3vectorsFromTangetVecAndPoints(fNormsumvec,InputNeiNodeWorldCoord, fdivecN);
-
-			if (LGeneratePatchExtractByWorldWithRandOffset(PatchNumIdex,fdivecN,InputNeiPWorldCoord, PatchInfo, IntensityImage, PatchImage) == false)
-			{    
+			Calc3vectorsFromTangetVecAndPoints2(ftdivec,InputWorldCoord, fdivec);
+			if (LGeneratePatchExtractByWorldWithRandOffset_inxyzTrain(PatchNumIdex,fdivec,InputWorldCoord, PatchInfo,IntensityImage, PatchImageArray) == false)
+			{
 				continue;//
+
 			}
+
+			//-------------------附近三个点--------------------
+			short labnum[4]={-1,-1,-1,-1};
+			labnum[1]=1;
+			int numNP=1;
 			PatchNumIdex++;
-			numNP++;
+			outfile_norm << PatchNumIdex << " " <<2<< "\n";//金标
+			//球内随机取点，直到取出三个点，都是不同的label值，如2，3，0；
+			srand((unsigned)time(NULL));  
 
+
+			while(PatchNumIdex<10000)
+			{
+
+				float randoffset1 = float((rand() % (200 * Offset))) / 100.0;	
+				float randoffset2 = float((rand() % (200 * Offset))) / 100.0;	
+				float randoffset3= float((rand() % (200 * Offset))) / 100.0;	;
+
+				float fvec1[3]={randoffset1*fdivec[0][0],randoffset1*fdivec[0][1],randoffset1*fdivec[0][2]};//切向随机长度
+				float fvec2[3]={randoffset2*fdivec[1][0],randoffset2*fdivec[1][1],randoffset2*fdivec[1][2]};
+				float fvec3[3]={randoffset3*fdivec[2][0],randoffset3*fdivec[2][1],randoffset3*fdivec[2][2]};
+				float fsumvec[3]={fvec1[0]+fvec2[0]+fvec3[0],fvec1[1]+fvec2[1]+fvec3[1],fvec1[2]+fvec2[2]+fvec3[2]};
+
+				//Rand shift
+				zxh::VectorOP_Normalise(fsumvec,3);
+				float randradius= float((rand() % (200 * Offset))) / 100.0;
+
+				float InputWorldCoord_x = InputWorldCoord[0] + randradius*fsumvec[0];
+				float InputWorldCoord_y = InputWorldCoord[1] + randradius*fsumvec[1];
+				float InputWorldCoord_z = InputWorldCoord[2] + randradius*fsumvec[2];
+				//
+				//
+
+				float InputNeiPWorldCoord[4]={InputWorldCoord_x,InputWorldCoord_y,InputWorldCoord_y,0};
+				//cout<< "warning: radius"<<randradius <<endl;
+				//
+				float InputNeiNodeWorldCoord[4]={InputWorldCoord_x,InputWorldCoord_y,InputWorldCoord_z,0 };
+				IntensityImage.GetImageInfo()->WorldToImage(InputNeiNodeWorldCoord);
+				int nscx = zxh::round(InputNeiNodeWorldCoord[0]);
+				int nscy = zxh::round(InputNeiNodeWorldCoord[1]);
+				int nscz = zxh::round(InputNeiNodeWorldCoord[2]);
+
+				bool bIsInsideImage = IntensityImage.InsideImage(nscx, nscy, nscz, 0); // 超过图像边界的，不给予考虑，也就是说，默认为normal myo
+				if (!bIsInsideImage)
+				{
+					std::cout << "warning: niebour node of point"<< ptid<< "is not inside image " << "\n"; //-----------------
+					continue;
+				}
+				short shlabnum=LabelImage.GetPixelGreyscale(nscx, nscy, nscz, 0);
+				bool bexitlab=false;
+				for (int k=0;k<4;k++)
+				{
+					int ndinten=labnum[k];
+					if (ndinten==shlabnum)
+					{
+						bexitlab=true;
+						break;
+					}
+				}
+
+				if(bexitlab)
+				{
+					continue;
+				}
+				else
+				{
+					//计算取patch主方向
+					float fNormsumvec[3]={fsumvec[0],fsumvec[1],fsumvec[2],};
+					zxh::VectorOP_Normalise(fNormsumvec,3);
+
+					if (zxh::VectorOP_Magnitude(fNormsumvec,3) <ZXH_FloatInfinitesimal)
+					{
+						std::cout << "error: magnitude too small for node " << ptid << "\n";
+						return false ;
+					}
+					//通过切向量和通过点计算其他两个相互垂直的向量
+					float fdivecN[3][3]={0};
+					Calc3vectorsFromTangetVecAndPoints2(fNormsumvec,InputNeiNodeWorldCoord, fdivecN);
+
+					if (LGeneratePatchExtractByWorldWithRandOffset_inxyzTrain(PatchNumIdex,fdivecN,InputNeiPWorldCoord, PatchInfo, IntensityImage, PatchImageArray) == false)
+					{    
+						continue;//
+					}
+					PatchNumIdex++;
+					numNP++;
+
+
+				}
+				float fprob=0;
+				if(shlabnum==0)
+				{
+					fprob=0;
+				}
+				if(shlabnum==2)
+				{
+					fprob=1;
+				}
+				if(shlabnum==3)
+				{
+					fprob=0.5;
+				}
+				labnum[shlabnum]=shlabnum;	
+				outfile_norm << PatchNumIdex << " " <<fprob<< "\n";
+				if(numNP==4) 
+					break;	
+
+			}//while	
 
 		}
-		float fprob=0;
-		if(shlabnum==0)
+
+		outfile_norm.close();
+		string Str_T1 = SavePathname + "Patch_s1.nii.gz";
+		string Str_T2 = SavePathname + "Patch_s2.nii.gz";
+		string Str_T3 = SavePathname + "Patch_s3.nii.gz";
+		zxh::SaveImage(PatchImageArray[0], Str_T1);
+		zxh::SaveImage(PatchImageArray[1], Str_T2);
+		zxh::SaveImage(PatchImageArray[2], Str_T3);	
+	}//train 的patch
+	if (strcmp(trainortest.c_str(),"-test1")==0)
+	{
+		cout<<"test1"<<endl;
+		string SavePatchinfo=SavePathname+"Patch.txt";
+		ofstream outfile_norm(SavePatchinfo, ios::beg);//output
+		std::vector<jdq2017::point3D>vcurveponts;
+		vcurveponts.clear();
+		ReadCurve(strCurvename,vcurveponts);
+
+		//
+		cout<<"Resample the curve by image spacing!"<<endl;
+		float fImgSpacing[]={1,1,1,1};//Add by JDQ
+		IntensityImage.GetImageSpacing(fImgSpacing[0],fImgSpacing[1],fImgSpacing[2],fImgSpacing[3] );//Add by JDQ
+		float fresamle=zxh::minf(fImgSpacing[1],fImgSpacing[2])*0.5;
+		cout<<"Old curve points: "<<vcurveponts.size()-1<<endl;
+		ResampleCurve(vcurveponts,fresamle);
+		cout<<"New curve points: "<<vcurveponts.size()-1<<endl;
+
+		//-----------生成 Patch Image ----------------------
+		zxhImageDataT<short> PatchImage1,PatchImage2,PatchImage3;
+		//计算patch的数量；size(patch)=size(imagepoints(vcurveponts))
+
+		std::vector<jdq2017::point3D>vponts;
+		vponts.clear();
+		int nptsize=CalculatePatchsize(IntensityImage,vcurveponts,vponts);
+
+		for (int i = 0; i < vponts.size(); i++)
 		{
-			fprob=0;
+			PointCordTypeDef TempPoint;
+			TempPoint.x =vponts[i]._x;
+			TempPoint.y =vponts[i]._y;
+			TempPoint.z =vponts[i]._z;
+			vPointCord.push_back(TempPoint);
 		}
-		if(shlabnum==2)
-		{
-			fprob=1;
-		}
-		if(shlabnum==3)
-		{
-			fprob=0.5;
-		}
-		labnum[shlabnum]=shlabnum;	
-		outfile_norm << PatchNumIdex << " " <<fprob<< "\n";
-		if(numNP==4) 
-			break;	
 
-		}//while	
 
+		int NtimesofCente=5;
+		outfile_norm << NtimesofCente*nptsize*3+nptsize<<" "<<0<< "\n";
+		//定义patch library的size
+
+		int P_newsize[] = { SiglePatchSize, NtimesofCente*nptsize*3+nptsize, 1, 1 };
+		PatchImage1.NewImage(2, P_newsize, spacing111, IntensityImage.GetImageInfo());
+		PatchImage2.NewImage(2, P_newsize, spacing111, IntensityImage.GetImageInfo());
+		PatchImage3.NewImage(2, P_newsize, spacing111, IntensityImage.GetImageInfo());
+		zxhImageData* ImageArray[2] = { &IntensityImage, &LabelImage };
+		zxhImageData* PatchImageArray[3]={&PatchImage1,&PatchImage2,&PatchImage3};
+		for(int ptid=0;ptid<vPointCord.size();ptid++)
+		{
+			if(ptid==186)
+				int xxx=0;
+			//-------------------Center--------------------
+			//获取当前点的patch
+			float InputWorldCoord[4] ={ vPointCord[ptid].x,  vPointCord[ptid].y,  vPointCord[ptid].z, 0 };
+			float inputimagecoord[4]={ vPointCord[ptid].x,  vPointCord[ptid].y,  vPointCord[ptid].z, 0 };
+			LabelImage.GetImageInfo()->WorldToImage(inputimagecoord);
+			int scx = zxh::round(inputimagecoord[0]);
+			int scy = zxh::round(inputimagecoord[1]);
+			int scz = zxh::round(inputimagecoord[2]);
+			float finten=LabelImage.GetPixelGreyscale(scx,scy,scz,0);
+
+			float fdivec[3][3]={0};//{fdivec[0][0],fdivec[0][1],fdivec[0][2]}是切线方向
+			float ftdivec[3]={0};
+			//计算切向量（第一个向量）
+
+			Calc_divec(ptid,ftdivec,vPointCord,fresamle);
+			if (zxh::VectorOP_Magnitude(ftdivec,3) <ZXH_FloatInfinitesimal)
+			{
+				std::cout << "error: magnitude too small for node " << ptid << "\n";
+				return false ;
+			}
+			//通过切向量和通过点计算其他两个相互垂直的向量
+			Calc3vectorsFromTangetVecAndPoints2(ftdivec,InputWorldCoord, fdivec);
+			if (LGeneratePatchExtractByWorldWithRandOffset_inxyzTest(PatchNumIdex,fdivec,InputWorldCoord, PatchInfo,IntensityImage, PatchImageArray) == false)
+			{
+				continue;//
+
+			}
+
+			//-------------------test附近三个点--------------------
+			short labnum[4]={-1,-1,-1,-1};
+			labnum[1]=1;
+
+			PatchNumIdex++;
+			outfile_norm << PatchNumIdex << " " <<2<< "\n";//金标
+			//球内随机取点，直到取出三个点，都是不同的label值，如2，3，0；
+			srand((unsigned)time(NULL));  
+			int numNP=1;
+			int Numbel[4]={0,0,0,0};
+			while(PatchNumIdex<10000)
+			{	
+
+
+				float randoffset1 = float((rand() % (200 * Offset))) / 100.0;	
+				float randoffset2 = float((rand() % (200 * Offset))) / 100.0;	
+				float randoffset3= float((rand() % (200 * Offset))) / 100.0;	;
+
+				float fvec1[3]={randoffset1*fdivec[0][0],randoffset1*fdivec[0][1],randoffset1*fdivec[0][2]};//切向随机长度
+				float fvec2[3]={randoffset2*fdivec[1][0],randoffset2*fdivec[1][1],randoffset2*fdivec[1][2]};
+				float fvec3[3]={randoffset3*fdivec[2][0],randoffset3*fdivec[2][1],randoffset3*fdivec[2][2]};
+				float fsumvec[3]={fvec1[0]+fvec2[0]+fvec3[0],fvec1[1]+fvec2[1]+fvec3[1],fvec1[2]+fvec2[2]+fvec3[2]};
+
+				//Rand shift
+				zxh::VectorOP_Normalise(fsumvec,3);
+				float randradius= float((rand() % (200 * Offset))) / 100.0;
+
+				float InputWorldCoord_x = InputWorldCoord[0] + randradius*fsumvec[0];
+				float InputWorldCoord_y = InputWorldCoord[1] + randradius*fsumvec[1];
+				float InputWorldCoord_z = InputWorldCoord[2] + randradius*fsumvec[2];
+				//
+				//
+
+				float InputNeiPWorldCoord[4]={InputWorldCoord_x,InputWorldCoord_y,InputWorldCoord_y,0};
+				//cout<< "warning: radius"<<randradius <<endl;
+				//
+				float InputNeiNodeWorldCoord[4]={InputWorldCoord_x,InputWorldCoord_y,InputWorldCoord_z,0 };
+				IntensityImage.GetImageInfo()->WorldToImage(InputNeiNodeWorldCoord);
+				int nscx = zxh::round(InputNeiNodeWorldCoord[0]);
+				int nscy = zxh::round(InputNeiNodeWorldCoord[1]);
+				int nscz = zxh::round(InputNeiNodeWorldCoord[2]);
+
+				bool bIsInsideImage = IntensityImage.InsideImage(nscx, nscy, nscz, 0); // 超过图像边界的，不给予考虑，也就是说，默认为normal myo
+				if (!bIsInsideImage)
+				{
+					std::cout << "warning: niebour node of point"<< ptid<< "is not inside image " << "\n"; //-----------------
+					continue;
+				}
+				short shlabnum=LabelImage.GetPixelGreyscale(nscx, nscy, nscz, 0);
+				//取到金标点
+				if(shlabnum==1) continue;
+				bool bexitlab=false;
+				for (int k=0;k<4;k++)
+				{
+					int ndinten=labnum[k];
+					if (ndinten==shlabnum)
+					{	
+						//如果取到需要数量
+						if (Numbel[ndinten]==NtimesofCente)
+						{
+							bexitlab=true;
+							break;
+						}
+					}
+				}
+
+				if(bexitlab)
+				{
+					continue;
+				}
+				else
+				{
+					//计算取patch主方向
+					float fNormsumvec[3]={fsumvec[0],fsumvec[1],fsumvec[2],};
+					zxh::VectorOP_Normalise(fNormsumvec,3);
+
+					if (zxh::VectorOP_Magnitude(fNormsumvec,3) <ZXH_FloatInfinitesimal)
+					{
+						std::cout << "error: magnitude too small for node " << ptid << "\n";
+						return false ;
+					}
+					//通过切向量和通过点计算其他两个相互垂直的向量
+					float fdivecN[3][3]={0};
+					Calc3vectorsFromTangetVecAndPoints2(fNormsumvec,InputNeiNodeWorldCoord, fdivecN);
+
+					if (LGeneratePatchExtractByWorldWithRandOffset_inxyzTest(PatchNumIdex,fdivecN,InputNeiPWorldCoord, PatchInfo, IntensityImage, PatchImageArray) == false)
+					{    
+						continue;//
+					}
+					PatchNumIdex++;
+					Numbel[shlabnum]++;
+
+				}
+				float fprob=0;
+				if(shlabnum==0)
+				{
+					fprob=0;
+
+				}
+				if(shlabnum==2)
+				{
+					fprob=1;
+
+				}
+				if(shlabnum==3)
+				{
+					fprob=0.5;
+
+				}
+				numNP++;
+				labnum[shlabnum]=shlabnum;	
+				outfile_norm << PatchNumIdex << " " <<fprob<< "\n";
+				if(numNP==NtimesofCente*3+1) 
+				{
+					break;	
+				}
+
+			}//while	
+
+		}
+
+
+
+
+		outfile_norm.close();
+		string Str_T1 = SavePathname + "Patch.nii.gz";
+		zxh::SaveImage(&PatchImage1, Str_T1);
+
+	}//testing 的patch
+	if (strcmp(trainortest.c_str(),"-test2")==0)
+	{
+		int ImgSizeraw[]={0,0,0,0};
+		IntensityImage.GetImageSize(ImgSizeraw[0],ImgSizeraw[1],ImgSizeraw[2],ImgSizeraw[3]);
+		int numofPatch=ImgSizeraw[2];
+
+		for (int i=0;i<numofPatch;i++)
+		{
+
+
+			for (int XN=0;XN<4;XN++)
+				for (int YN=0;YN<4;YN++)
+				{
+					int XNStart=XN*ImgSizeraw[0]/4;
+					int YNStart=YN*ImgSizeraw[1]/4;
+
+					string SavePatchinfo=SavePathname+"Patchinfo_"+num2str(i)+"_" +num2str(YN)+"_"+num2str(XN)+".txt";
+					ofstream outfile_norm(SavePatchinfo, ios::beg);//output
+					for (int j=YNStart;j<YNStart+ImgSizeraw[1]/4;j++)
+						for (int k=XNStart;k<XNStart+ImgSizeraw[0]/4;k++)
+						{
+
+							float curvpointsWolrd[] = { k,j,i, 0 };
+							IntensityImage.GetImageInfo()->ImageToWorld(curvpointsWolrd);//物理坐标转成图像坐标
+							PointCordTypeDef TempPoint;
+							TempPoint.x =curvpointsWolrd[0];
+							TempPoint.y =curvpointsWolrd[1];
+							TempPoint.z =curvpointsWolrd[2];
+							vPointCord.push_back(TempPoint);
+
+						}
+						int npt=vPointCord.size();
+						outfile_norm << npt<<" "<<0<< "\n";
+						zxhImageDataT<short> PatchImage1,PatchImage2,PatchImage3;
+						int P_newsize[] = { SiglePatchSize,npt , 1, 1 };
+						PatchImage1.NewImage(2, P_newsize, spacing111, IntensityImage.GetImageInfo());
+						PatchImage2.NewImage(2, P_newsize, spacing111, IntensityImage.GetImageInfo());
+						PatchImage3.NewImage(2, P_newsize, spacing111, IntensityImage.GetImageInfo());
+						zxhImageData* PatchImageArray[3]={&PatchImage1,&PatchImage2,&PatchImage3};
+
+
+						//生成一个patch
+						for(int ptid=0;ptid<vPointCord.size();ptid++)
+						{
+							//获取当前点的patch
+							float InputWorldCoord[4] ={ vPointCord[ptid].x,  vPointCord[ptid].y,  vPointCord[ptid].z, 0 };
+							float inputimagecoord[4]={ vPointCord[ptid].x,  vPointCord[ptid].y,  vPointCord[ptid].z, 0 };
+							LabelImage.GetImageInfo()->WorldToImage(inputimagecoord);
+							int scx = zxh::round(inputimagecoord[0]);
+							int scy = zxh::round(inputimagecoord[1]);
+							int scz = zxh::round(inputimagecoord[2]);
+							float finten=LabelImage.GetPixelGreyscale(scx,scy,scz,0);
+
+							float fdivec[3][3]={0};//{fdivec[0][0],fdivec[0][1],fdivec[0][2]}是切线方向
+							float ftdivec[3]={0};
+
+							if (LGeneratePatchExtractByWorldWithRandOffset_inxyzTest(PatchNumIdex,fdivec,InputWorldCoord, PatchInfo,IntensityImage, PatchImageArray) == false)
+							{
+								continue;//
+
+							}
+							short shlabnum =LabelImage.GetPixelGreyscale(scx,scy,scz);
+							float fprob=0;
+							if(shlabnum==0)
+							{
+								fprob=0;
+
+							}
+							if(shlabnum==2)
+							{
+								fprob=1;
+
+							}
+							if(shlabnum==3)
+							{
+								fprob=0.5;
+
+							}
+							if(shlabnum==1)
+							{
+								fprob=2;
+
+							}
+
+							outfile_norm << PatchNumIdex << " " <<fprob<< "\n";
+
+						}
+						outfile_norm.close();
+						string Str_T1 = SavePathname + "Patch_"+num2str(i)+"_" +num2str(YN)+"_"+num2str(XN)+".nii.gz";
+						zxh::SaveImage(&PatchImage1, Str_T1);
+				}
+		}
 	}
-	outfile_norm.close();
-	short x=PatchImage.GetPixelGreyscale(0,0,0,0);
-	zxh::SaveImage(&PatchImage, Str_T);
 	return 0;
 }
 
