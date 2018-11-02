@@ -1,4 +1,4 @@
-
+﻿
 
 /*=========================================================================
 
@@ -92,10 +92,38 @@ Version:   $Revision: 2.2.1 $
 #include<stdlib.h>
 #include<stdio.h>
 
+
+
+
+#include <vtkDiscreteMarchingCubes.h>
+#include <vtkWindowedSincPolyDataFilter.h>
+#include <vtkSmartPointer.h>
+#include <vtkImageThreshold.h>
+#include <vtkSTLWriter.h>
+#include <vtkImageData.h>
+#include <vtkPointData.h>
+#include <vtkImageReader.h>
+#include <vtkImageShiftScale.h>
+#include <vtkImageChangeInformation.h>
+
+#include <vtkPointData.h>
+#include <vtkUnstructuredGrid.h>
+#include <vtkPolyDataMapper.h>  
+#include <vtkActor.h>  
+#include <vtkRenderer.h>  
+#include <vtkRenderWindow.h>  
+#include <vtkRenderWindowInteractor.h>
+
+
 #include "zxhImageData.h"
 #include "zxhImageGipl.h"
 #include "zxhImageNifti.h"
-
+typedef struct
+{
+	float x;
+	float y;
+	float z;
+}PointCordTypeDef;
 
 #define TAB_CHAR	9
 using namespace std;
@@ -169,58 +197,173 @@ bool Generate_sur_from_vol(short *smaskData,int nlabnum,zxhImageDataT<short> &im
 						if (fnormfG!=0)
 						{
 							int nG=1;
-						imglabsur.SetPixelByGreyscale(ix,iy,iz,it,nG);
+							imglabsur.SetPixelByGreyscale(ix,iy,iz,it,nG);
 						}
 					}
 				}
 				return true;
 }
-
+int GeneratePontsset(zxhImageData &LabelImage,vector<PointCordTypeDef>&vPointCord)
+{
+	int ImgNewSize[4]={0,0,0,0};
+	LabelImage.GetImageSize(ImgNewSize[0],ImgNewSize[1],ImgNewSize[2],ImgNewSize[3]);
+	for(int it=0;it<ImgNewSize[3];++it)
+		for(int iz=0;iz<ImgNewSize[2];++iz)
+			for(int iy=0;iy<ImgNewSize[1];++iy)
+				for(int ix=0;ix<ImgNewSize[0];++ix)
+				{
+					short intlabinte=LabelImage.GetPixelGreyscale(ix,iy,iz,it);
+					if(intlabinte==1)
+					{
+						float PointWorldCor[3]={ix,iy,iz};
+						LabelImage.GetImageInfo()->ImageToWorld(PointWorldCor);
+						PointCordTypeDef Ponttemp;
+						Ponttemp.x=PointWorldCor[0];
+						Ponttemp.y=PointWorldCor[1];
+						Ponttemp.z=PointWorldCor[2];
+						vPointCord.push_back(Ponttemp);
+					}
+				}
+				return vPointCord.size();
+}
 int main(int argc, char *argv[])
 {
+
+	//-------------------
+	string surffile="E:\work_jdq\RCAAEF\train\rcaaef_32_img00\whs_lab_image205surf.nii.gz";
+	string resultname="E:\work_jdq\RCAAEF\train\rcaaef_32_img00\whs_lab_image205mesh.stl";
+	vtkSmartPointer<vtkImageReader> reader =
+    vtkSmartPointer<vtkImageReader>::New();
+  vtkSmartPointer<vtkImageThreshold> selector =
+	  vtkSmartPointer<vtkImageThreshold>::New();
+  vtkSmartPointer<vtkDiscreteMarchingCubes> discreteCubes =
+    vtkSmartPointer<vtkDiscreteMarchingCubes>::New(); //marching cubes是经过处理之后的二值图，discrete marching cubes是没有经过处理的原始label
+  vtkSmartPointer<vtkWindowedSincPolyDataFilter> smoother =
+    vtkSmartPointer<vtkWindowedSincPolyDataFilter>::New();
+  vtkSmartPointer<vtkSTLWriter> stlwriter =
+	  vtkSmartPointer<vtkSTLWriter>::New();
+
+
+  // Define all of the variables
+  unsigned int startLabel = 0;
+  unsigned int endLabel = 1;
+  unsigned int smoothingIterations = 15;
+  double passBand = 0.001;
+  double featureAngle = 120.0;
+
+
+  reader->SetFileName(surffile.c_str());
+  reader->Update();
+
+  //Generate mesh
+  discreteCubes->SetInputConnection(reader->GetOutputPort());
+  discreteCubes->GenerateValues(
+	  endLabel - startLabel + 1, startLabel, endLabel);
+  discreteCubes->Update();
+
+  //smooth
+  smoother->SetInputConnection(discreteCubes->GetOutputPort());
+  smoother->SetNumberOfIterations(smoothingIterations);
+  smoother->BoundarySmoothingOff();
+  smoother->FeatureEdgeSmoothingOff();
+  smoother->SetFeatureAngle(featureAngle);
+  smoother->SetPassBand(passBand);
+  smoother->NonManifoldSmoothingOn();
+  smoother->NormalizeCoordinatesOn();
+  smoother->Update();
+
+    stlwriter->SetInputConnection(smoother->GetOutputPort());
+  stlwriter->SetFileTypeToASCII();
+  stlwriter->SetFileName(resultname.c_str());//save stl file
+  stlwriter->Write();
+
+  //stlwriter->SetInputConnection(smoother->GetOutputPort());
+  //stlwriter->SetFileTypeToASCII();
+  //stlwriter->SetFileName(mesh_name.c_str());//save stl file
+  //stlwriter->Write();
+
+
+
+
+
+
+
+
+
+
+
+
+
+	//zxhImageDataT<short> IntensityImage;
+	//zxh::OpenImageSafe(&IntensityImage,surffile);
+	//vector<PointCordTypeDef> vPointCord;//patch的中心点
+	//int nptsize=GeneratePontsset(IntensityImage,vPointCord);
+
+	//vtkSmartPointer<vtkPoints> points =
+	//	vtkSmartPointer<vtkPoints>::New();
+	//vtkSmartPointer<vtkCellArray> aCellArray =
+	//	vtkSmartPointer<vtkCellArray>::New();
+	//for(int ptid=0;ptid<vPointCord.size();ptid++)
+	//{
+
+	//	float InputWorldCoord[4] ={ vPointCord[ptid].x,  vPointCord[ptid].y,  vPointCord[ptid].z, 0 };
+	//	vtkIdType pointId = points->InsertNextPoint(InputWorldCoord[0],InputWorldCoord[1],InputWorldCoord[2]);
+	//	aCellArray->InsertCellPoint(pointId);
+
+	//}
+	//vtkSmartPointer<vtkPolyData> polys=vtkSmartPointer<vtkPolyData>::New();
+	//polys->SetPoints(points);
+	//polys->SetPolys(aCellArray);
+	//vtkSmartPointer<vtkDelaunay3D> triangulator =vtkSmartPointer<vtkDelaunay3D>::New();
+	//triangulator->Update();
+
+
+	//-----------------
+
+
 	//if( argc < 4 )
 	//{
 	//	cerr << "Usage: " << endl;
 	//	cerr << "jdqMapPont2Img.cpp	imageRaw(.nii)	Line or points(.vtk) results -NorR" << endl;
 	//	return -1;
 	//}
-	string strFileNameRaw ="E:/work_jdq/RCAAEF/train/rcaaef_32_img00/whs_lab_image.nii.gz";
-	int nlabnum=500;
-	char *chResultName="E:/work_jdq/RCAAEF/train/rcaaef_32_img00/sur_whs_lab_image500.nii.gz";
-	zxhImageDataT<short> imglabvol;
-	zxhImageDataT<short> imglabsur;
-	if( zxh::OpenImage( &imglabvol, strFileNameRaw ) == false )
-	{
-		std::cerr << "Raw image(nifti-file) is not found!"<<endl; 
-		return -1;
-	}
-	imglabsur.NewImage( imglabvol.GetImageInfo() );
-	int ImgNewSize[4]={1};
-	imglabsur.GetImageSize(ImgNewSize[0],ImgNewSize[1],ImgNewSize[2],ImgNewSize[3]);
-	const short *sintData = imglabvol.GetImageData();	
-	short *smaskData = new short[ImgNewSize[0]*ImgNewSize[1]*ImgNewSize[2]];
-	//sintData[nz * ImgNewSize[1] * ImgNewSize[0] + ny * ImgNewSize[0] +nx];
-	int np1[3]={54,111,55};
-	int np2[3]={0,0,0};
-	int npd=0;
-	//TransDatanum2Greynum(np1,npd,ImgNewSize);
-	//TransGreynum2Datanum(npd,np2,ImgNewSize);
-	//short curpinten1=sintData[npd];
-	//short curpinten2=imglabvol.GetPixelGreyscale(np1[0],np1[1],np1[2]);
-	int vnum=imglabsur.GetNumberOfPixels();
-	for (int i = 0; i < vnum; i++)
-	{
-		short curpinten1=sintData[i];
-		if(curpinten1==nlabnum)
-			smaskData[i]=1;
-		else
-			smaskData[i]=0;
-	}
+	//string strFileNameRaw ="E:/work_jdq/RCAAEF/train/rcaaef_32_img00/whs_lab_image.nii.gz";
+	//int nlabnum=500;
+	//char *chResultName="E:/work_jdq/RCAAEF/train/rcaaef_32_img00/sur_whs_lab_image500.nii.gz";
+	//zxhImageDataT<short> imglabvol;
+	//zxhImageDataT<short> imglabsur;
+	//if( zxh::OpenImage( &imglabvol, strFileNameRaw ) == false )
+	//{
+	//	std::cerr << "Raw image(nifti-file) is not found!"<<endl; 
+	//	return -1;
+	//}
+	//imglabsur.NewImage( imglabvol.GetImageInfo() );
+	//int ImgNewSize[4]={1};
+	//imglabsur.GetImageSize(ImgNewSize[0],ImgNewSize[1],ImgNewSize[2],ImgNewSize[3]);
+	//const short *sintData = imglabvol.GetImageData();	
+	//short *smaskData = new short[ImgNewSize[0]*ImgNewSize[1]*ImgNewSize[2]];
+	////sintData[nz * ImgNewSize[1] * ImgNewSize[0] + ny * ImgNewSize[0] +nx];
+	//int np1[3]={54,111,55};
+	//int np2[3]={0,0,0};
+	//int npd=0;
+	////TransDatanum2Greynum(np1,npd,ImgNewSize);
+	////TransGreynum2Datanum(npd,np2,ImgNewSize);
+	////short curpinten1=sintData[npd];
+	////short curpinten2=imglabvol.GetPixelGreyscale(np1[0],np1[1],np1[2]);
+	//int vnum=imglabsur.GetNumberOfPixels();
+	//for (int i = 0; i < vnum; i++)
+	//{
+	//	short curpinten1=sintData[i];
+	//	if(curpinten1==nlabnum)
+	//		smaskData[i]=1;
+	//	else
+	//		smaskData[i]=0;
+	//}
 
-	cout<<"initialization: success!"<<endl;
-	Generate_sur_from_vol(smaskData,nlabnum,imglabsur);
-	zxh::SaveImage(&imglabsur,chResultName);
-	cout << "Generate surface: successfully" << endl;
+	//cout<<"initialization: success!"<<endl;
+	//Generate_sur_from_vol(smaskData,nlabnum,imglabsur);
+	//zxh::SaveImage(&imglabsur,chResultName);
+	//cout << "Generate surface: successfully" << endl;
 
 
 }
