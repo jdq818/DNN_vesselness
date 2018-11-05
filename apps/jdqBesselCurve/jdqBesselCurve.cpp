@@ -140,6 +140,8 @@ bool ReadTxt_Pdef(char *chFileName,vector<PointCordTypeDef>&pPont)
 		nEnd = strLine.find_first_of(' ', nStart);
 		strNum.assign(strLine, nStart, nEnd - nStart);
 		strctTempPoint.z =atof(strNum.c_str());
+		strctTempPoint.x=-1*strctTempPoint.x;
+		strctTempPoint.y=-1*strctTempPoint.y;
 		pPont.push_back(strctTempPoint);
 	}
 	return true;

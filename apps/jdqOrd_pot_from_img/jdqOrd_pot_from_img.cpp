@@ -203,7 +203,7 @@ void WriteModCA2Txt(char *chFileName,vector<PointCordTypeDef>vPBr)
 	for (int i = 0; i < nPointNum; i++)
 	{
 		
-		WriteFileTxt <<right<<fixed<<setfill('4')<<setprecision(4)<<vPBr[i].x<<' '<<vPBr[i].y<<' '<<vPBr[i].z<<'\n';
+		WriteFileTxt <<right<<fixed<<setfill('4')<<setprecision(4)<<-1*vPBr[i].x<<' '<<-1*vPBr[i].y<<' '<<vPBr[i].z<<'\n';
 
 	}	
 

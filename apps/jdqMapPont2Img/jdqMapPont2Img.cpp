@@ -821,25 +821,7 @@ int main(int argc, char *argv[])
 	string RorN=string(argv[4]);
 	string RorS=string(argv[5]);//resample the line or not
 	
-	/*string strFileNameRaw ="J:/work_jdq/RCAAEF_48/testing/dataset24/image/image.nii.gz";
-	char *chFileName ="J:/work_jdq/infiles/RCAAEF_48/testing/dataset24/centerlinesRadius/vessel1.txt";
-	char *chResultName ="J:/work_jdq/RCAAEF_48/testing/dataset24/image/vessel1.nii.gz";
-    string RorN="-N";*/
-
-	//string strFileNameRaw ="F:/Coronary_0/Coronary_Niessen/CoronaryMasks/DataMaskOutLung/mol_image00.nii";
-	//char *chFileName ="F:/Coronary_0/Exp6_detect_ostia/Ostia0007To00007/result_dataset00_rightostium.txt";
-	//char *chResultName ="F:/Coronary_0/Exp6_detect_ostia/MapModelToImg/MP_img00.nii.gz";
- //   string RorN="-R";
-//***Training Data as model****//
 	
-	//string strFileNameRaw =  "F:/Coronary_0/Coronary_Niessen/CoronaryMasks/DataMaskOutLung/mol_image00.nii";
-	//char *chFileName = "F:/Coronary_0/Coronary_Niessen/ProcessByLL/training/dataset00/vessel2/reference.vtk";
-	//char *chResultFilePath = "F:/Coronary_0/Coronary_Niessen/ProcessByLL/training/dataset00/vessel2";
-
-
-	//char *chFileName = "F:/Coronary_0/trainningdataZXHCAEDMP/LowResoResults/mod03_to_unseen01_results/vessel2_MLL_1/MCLine.vtk";
-	//char *chResultFilePath = "F:/Coronary_0/trainningdataZXHCAEDMP/LowResoResults/mod03_to_unseen01_results/vessel2_MLL_1";
-   //char *chFileName = "F:/Coronary_0/Coronary_Niessen/mean_centerline_2014_01_17/image01_meancenterline_v2.vtk";
 	//***Training Data as model****//
 	
 	zxhImageDataT<short> imgReadRaws,imgReadResoRaws;//Change by JDQ
@@ -918,35 +900,9 @@ int main(int argc, char *argv[])
 					}
 					MapModelPointsToImage(vPathPointsWorld,imgReadNewRaw,SearchRange);
 	}
-	if (RorN=="-R")//map to a input image
-	{
-		cout<<"The line or points wil be mapped to the input image."<<endl;
-		for(int it=0;it<ImgNewSize[3];++it)
-			for(int iz=0;iz<ImgNewSize[2];++iz)
-				for(int iy=0;iy<ImgNewSize[1];++iy)
-					for(int ix=0;ix<ImgNewSize[0];++ix)
-					{
-						short ss=imgReadRaws.GetPixelGreyscale(ix,iy,iz,0);
-						imgReadNewRaw.SetPixelByGreyscale(ix,iy,iz,it,ss);
-					}
-					MapModelPointsToImage(vPathPointsWorld,imgReadNewRaw,SearchRange);
-	}
 
-	//imgReadResoNewRaws.NewImage( imgReadResoRaws.GetImageInfo() );
-	//MapModelPointsToNewImage(vPathPointsWorld,imgReadRaws);
-	//MapModelPointsToNewImageWithinR(vPathPointsWorld,imgReadRaws,SearchRange);//map to original image in a range
-	if (RorN=="-OCC")//map to a input image
-	{
-		cout<<"The breaking line wil map to a new image";
-		for(int it=0;it<ImgNewSize[3];++it)
-			for(int iz=0;iz<ImgNewSize[2];++iz)
-				for(int iy=0;iy<ImgNewSize[1];++iy)
-					for(int ix=0;ix<ImgNewSize[0];++ix)
-					{
-						imgReadNewRaw.SetPixelByGreyscale(ix,iy,iz,it,0);
-					}
-					MapModelPointsToImage_OCC(vPathPointsWorld,imgReadNewRaw,SearchRange);
-	}
+
+
 	
 
 	

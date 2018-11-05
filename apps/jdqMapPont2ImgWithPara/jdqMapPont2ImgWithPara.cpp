@@ -132,6 +132,7 @@ typedef struct
 	float x;
 	float y;
 	float z;
+	float rad;
 }PointCordTypeDef;
 
 
@@ -562,7 +563,7 @@ bool MapModelPointsToNewImageNew(vector<PointCordTypeDef> vPathPointsWorld,zxhIm
 	}
 	return true;
 }
-bool MapModelPointsToImage(vector<PointCordTypeDef> vPathPointsWorld,zxhImageDataT<float>&imgReadNewVsls,std::vector<double> rad)//map line into original image in a range
+bool MapModelPointsToImage(vector<PointCordTypeDef> vPathPointsWorld,zxhImageDataT<short>&imgReadNewVsls)//map line into original image in a range
 {
 	int ImgNewVslsSize[4]={1};
 	imgReadNewVsls.GetImageSize(ImgNewVslsSize[0],ImgNewVslsSize[1],ImgNewVslsSize[2],ImgNewVslsSize[3]);
@@ -578,6 +579,7 @@ bool MapModelPointsToImage(vector<PointCordTypeDef> vPathPointsWorld,zxhImageDat
 		PointPosWorld[0]=vPathPointsWorld[i].x;
 		PointPosWorld[1]=vPathPointsWorld[i].y;
 		PointPosWorld[2]=vPathPointsWorld[i].z;
+	
 		//cout<<"WPoints:"<<i<<":" <<PointPosWorld[0]<<" "<<PointPosWorld[1]<<" "<<PointPosWorld[2]<<" "<<endl;
 		imgReadNewVsls.GetImageInfo()->WorldToImage(PointPosWorld);
 
@@ -590,11 +592,11 @@ bool MapModelPointsToImage(vector<PointCordTypeDef> vPathPointsWorld,zxhImageDat
 		PointMAPT.y=PointPos[1];
 		PointMAPT.z=PointPos[2];
 		vPathPointsWorldMAPT.push_back(PointMAPT);
-		//cout<<"Points:" <<PointPos[0]<<" "<<PointPos[1]<<" "<<PointPos[2]<<" "<<endl;
-		imgReadNewVsls.SetPixelByGreyscale(PointPos[0],PointPos[1],PointPos[2],PointPos[3],rad[i]);
+		imgReadNewVsls.SetPixelByGreyscale(PointPos[0],PointPos[1],PointPos[2],PointPos[3],vPathPointsWorld[i].rad*1000);
 
 	}
 	return true;
+
 }
 
 bool MapModelPointsToImage_OCC(vector<PointCordTypeDef> vPathPointsWorld,zxhImageDataT<short>&imgReadNewVsls,int SearchRange[4])//map line into original image in a range
@@ -662,12 +664,7 @@ bool MapModelPointsToImage_OCC(vector<PointCordTypeDef> vPathPointsWorld,zxhImag
 	}
 	return true;
 }
-bool VesselnessMaskBaseOnStructElement(vector<PointCordTypeDef> vPathPoints,zxhImageDataT<short>&imgReadVsls,zxhImageDataT<short>&imgReadNewVsls)
-{
-	InterpoforNewImage(vPathPoints,imgReadNewVsls);
-	//DilateforNewImage();
-	return true;
-}
+
 char *GetPathEXT(char *chFileName)
 {  char path_buffer[_MAX_PATH];  
 char drive[_MAX_DRIVE];  
@@ -687,19 +684,21 @@ bool ReadTxtAsPC(char *chFileName,float fresamle, vector<PointCordTypeDef> &Poin
 		return 1;
 	}
 	//按照jda point格式读取line文件
-	std::vector<jdq2017::point3D> ref1,ref;
+	std::vector<jdq2017::point3D> refm,ref;
 	std::vector<double> rad;
+	std::vector<double> radm;
 	std::vector<double> io;
 	std::vector<jdq2017::point3D> cl;
-	if ( ! jdq2017::readReference(chFileName, ref1, rad, io))
+	if ( !jdq2017::readReference(chFileName, refm, radm, io))
 	{
 		std::cerr << "Error in reading line data" << std::endl;
 		return 1;
 	}
 	//resample the points
 	jdq2017::ResamplePaths<jdq2017::point3D>Respler;
-	Respler(ref1,fresamle);
+	Respler(refm,radm,fresamle);
 	ref=Respler.resultPath();
+	rad=Respler.resultRadius();
 	//将ref points 的数据转存成PointCord
 	if (!PointCord.empty())
 	{
@@ -711,22 +710,21 @@ bool ReadTxtAsPC(char *chFileName,float fresamle, vector<PointCordTypeDef> &Poin
 		strctTempPoint.x =-1*ref[i]._x;
 		strctTempPoint.y =-1*ref[i]._y;
 		strctTempPoint.z =ref[i]._z;
+		strctTempPoint.rad=rad[i];
 		PointCord.push_back(strctTempPoint);
 	}
 	return true;
 }
-bool ReadTxtAsPCWRes(char *chFileName, vector<PointCordTypeDef> &PointCord,std::vector<double> &rad)
+bool ReadTxtAsPCWRes(char *chFileName, vector<PointCordTypeDef> &PointCord)
 {
 	if (chFileName == NULL)
 	{
 		cout << "Cannot find VTK-file!" << endl;
 		return 1;
 	}
-
-	std::vector<double> io;
 	//按照jda point格式读取line文件
-	std::vector<jdq2017::point3D> ref;
-	if ( ! jdq2017::readReference(chFileName, ref, rad, io))
+	std::vector<jdq2017::point3D>ref;
+	if ( ! jdq2017::readCenterline(chFileName, ref))
 	{
 		std::cerr << "Error in reading line data" << std::endl;
 		return 1;
@@ -809,7 +807,7 @@ bool ReadPointTxt_ostia(char *filename,vector< PointCordTypeDef> &cl)
 }
 int main(int argc, char *argv[])
 {
-	if( argc < 4 )
+	if( argc < 5 )
 	{
 		cerr << "Usage: " << endl;
 		cerr << "jdqMapPont2ImgWithPara	imageRaw(.nii)	Line or points(.vtk) results -NorS" << endl;
@@ -818,31 +816,10 @@ int main(int argc, char *argv[])
 	string strFileNameRaw =string(argv[1]);//  "F:/Coronary_0/Coronary_Niessen/CoronaryMasks/DataMaskOutLung/mol_image00.nii";
 	char *chFileName =argv[2];//"F:/Coronary_0/Coronary_Niessen/ProcessByLL/training/dataset00/vessel2/reference.vtk";
 	char *chResultName =argv[3];// "F:/Coronary_0/Coronary_Niessen/ProcessByLL/training/dataset00/vessel2/MCLine.nii.gz";
-	string NorS=string(argv[4]);//resample the line or not
-
-	//string strFileNameRaw ="J:/work_jdq/data_DNN/RCAAEF_32/training/dataset00/image/image.nii.gz";//  "F:/Coronary_0/Coronary_Niessen/CoronaryMasks/DataMaskOutLung/mol_image00.nii";
-	//char *chFileName ="J:/work_jdq/infiles/data_DNN/RCAAEF_32/training/dataset00/centerlinesLength/res_vessel0.txt";
-	//char *chResultName ="J:/work_jdq/infiles/data_DNN/RCAAEF_32/training/dataset00/centerlinesLength/res_vessel0.nii.gz";
-	//string NorS="-N";//resample the line or not
-	/*string strFileNameRaw ="J:/work_jdq/RCAAEF_48/testing/dataset24/image/image.nii.gz";
-	char *chFileName ="J:/work_jdq/infiles/RCAAEF_48/testing/dataset24/centerlinesRadius/vessel1.txt";
-	char *chResultName ="J:/work_jdq/RCAAEF_48/testing/dataset24/image/vessel1.nii.gz";
-	string RorN="-N";*/
-
-	//string strFileNameRaw ="F:/Coronary_0/Coronary_Niessen/CoronaryMasks/DataMaskOutLung/mol_image00.nii";
-	//char *chFileName ="F:/Coronary_0/Exp6_detect_ostia/Ostia0007To00007/result_dataset00_rightostium.txt";
-	//char *chResultName ="F:/Coronary_0/Exp6_detect_ostia/MapModelToImg/MP_img00.nii.gz";
-	//   string RorN="-R";
-	//***Training Data as model****//
-
-	//string strFileNameRaw =  "F:/Coronary_0/Coronary_Niessen/CoronaryMasks/DataMaskOutLung/mol_image00.nii";
-	//char *chFileName = "F:/Coronary_0/Coronary_Niessen/ProcessByLL/training/dataset00/vessel2/reference.vtk";
-	//char *chResultFilePath = "F:/Coronary_0/Coronary_Niessen/ProcessByLL/training/dataset00/vessel2";
+	string RorN=string(argv[4]);
+	string RorS=string(argv[5]);//resample the line or not
 
 
-	//char *chFileName = "F:/Coronary_0/trainningdataZXHCAEDMP/LowResoResults/mod03_to_unseen01_results/vessel2_MLL_1/MCLine.vtk";
-	//char *chResultFilePath = "F:/Coronary_0/trainningdataZXHCAEDMP/LowResoResults/mod03_to_unseen01_results/vessel2_MLL_1";
-	//char *chFileName = "F:/Coronary_0/Coronary_Niessen/mean_centerline_2014_01_17/image01_meancenterline_v2.vtk";
 	//***Training Data as model****//
 
 	zxhImageDataT<short> imgReadRaws,imgReadResoRaws;//Change by JDQ
@@ -867,7 +844,7 @@ int main(int argc, char *argv[])
 	{
 		SearchRange[i]=int(fOldImgSpacing[i]/fNewImgSpacing[i]+0.5);
 	}
-	zxhImageDataT<float>imgReadNewRaw,imgReadResoNewRaws;
+	zxhImageDataT<short>imgReadNewRaw;
 	imgReadNewRaw.NewImage( imgReadRaws.GetImageInfo() );
 	int ImgNewSize[4]={1};
 	imgReadNewRaw.GetImageSize(ImgNewSize[0],ImgNewSize[1],ImgNewSize[2],ImgNewSize[3]);
@@ -895,9 +872,9 @@ int main(int argc, char *argv[])
 		DetectFile.open(chFileName,ios::in);
 		if(DetectFile)
 		{
-			if (NorS=="-N")
+			if (RorS=="-N")
 			{
-				ReadTxtAsPCWRes(chFileName, vPathPointsWorld,rad);
+				ReadTxtAsPCWRes(chFileName, vPathPointsWorld);
 			}
 			else
 			{
@@ -910,18 +887,21 @@ int main(int argc, char *argv[])
 	}
 	cout<<"Number of points:" <<vPathPointsWorld.size()-1<<endl;
 	cout<<"The line or points wil be mapped to the totally new image with the parameters."<<endl;
-	for(int it=0;it<ImgNewSize[3];++it)
-		for(int iz=0;iz<ImgNewSize[2];++iz)
-			for(int iy=0;iy<ImgNewSize[1];++iy)
-				for(int ix=0;ix<ImgNewSize[0];++ix)
-				{
-
-					imgReadNewRaw.SetPixelByGreyscale(ix,iy,iz,it,0);
-				}
-				MapModelPointsToImage(vPathPointsWorld,imgReadNewRaw,rad);
-				string chFileName2(chResultName);
-				zxh::SaveImage(&imgReadNewRaw,chFileName2.c_str());
-				cout << "Map successfully!" << endl;
+	if (RorN=="-N")//map to a totally new image
+	{
+		cout<<"The line or points wil be mapped to the totally new image."<<endl;
+		for(int it=0;it<ImgNewSize[3];++it)
+			for(int iz=0;iz<ImgNewSize[2];++iz)
+				for(int iy=0;iy<ImgNewSize[1];++iy)
+					for(int ix=0;ix<ImgNewSize[0];++ix)
+					{
+						imgReadNewRaw.SetPixelByGreyscale(ix,iy,iz,it,0);
+					}
+					MapModelPointsToImage(vPathPointsWorld,imgReadNewRaw);
+	}
+	string chFileName2(chResultName);
+	zxh::SaveImage(&imgReadNewRaw,chFileName2.c_str());
+	cout << "Map successfully!" << endl;
 
 
 }
