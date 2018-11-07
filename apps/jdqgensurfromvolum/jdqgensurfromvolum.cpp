@@ -91,7 +91,7 @@ Version:   $Revision: 2.2.1 $
 #include <math.h>
 #include<stdlib.h>
 #include<stdio.h>
-
+#include<algorithm>
 
 
 
@@ -226,64 +226,143 @@ int GeneratePontsset(zxhImageData &LabelImage,vector<PointCordTypeDef>&vPointCor
 				}
 				return vPointCord.size();
 }
+double generateGaussianNoise(double mu, double sigma)
+{
+	const double epsilon = 1.17549e-038;
+	const double two_pi = 2.0*3.14159265358979323846;
+
+	static double z0, z1;
+	static bool generate;
+	generate = !generate;
+
+	if (!generate)
+		return z1 * sigma + mu;
+
+	double u1, u2;
+	do
+	{
+		u1 = rand() * (1.0 / RAND_MAX);
+		u2 = rand() * (1.0 / RAND_MAX);
+	}
+	while ( u1 <= epsilon );
+
+	z0 = sqrt(-2.0 * log(u1)) * cos(two_pi * u2);
+	z1 = sqrt(-2.0 * log(u1)) * sin(two_pi * u2);
+	return z0 * sigma + mu;
+}
+bool Generate_gaussianrad(int nptofonepoint,float frad,vector<float>&vrandrad)
+{	
+
+	float maxrad=1.5*frad;
+	vrandrad.clear();
+	float epsilon =0.01;
+	srand((unsigned)time(NULL));
+	float fprob=100000;
+	if (maxrad==0)
+	{
+		int x=0;
+	}
+	while (1)
+	{
+		float randrad =((rand() % (400)) / 100.0)*frad;	
+		fprob=zxh::Gaussian(float (randrad),float(0),float(maxrad));
+		if (fprob>= epsilon)
+		{
+			vrandrad.push_back(0.5+frad+randrad);//超过一个spacing
+			if (vrandrad.size()>=nptofonepoint)
+			{
+				break;
+			}
+		}
+	}
+
+	return true;
+}
+bool Generate_gaussianrad_web(int nptofonepoint,float frad,vector<float>&vrandrad)
+{	
+
+	float maxrad=1.5*frad;
+	vrandrad.clear();
+	srand((unsigned)time(NULL));
+	float fprob=100000;
+	if (maxrad==0)
+	{
+		int x=0;
+	}
+	while (1)
+	{
+		float fgrad =generateGaussianNoise(0,maxrad);
+		vrandrad.push_back(abs(fgrad));//超过一个spacing
+		if (vrandrad.size()>=nptofonepoint)
+		{
+			break;
+		}
+
+	}
+	sort(vrandrad.begin(),vrandrad.end());
+
+	return true;
+}
 int main(int argc, char *argv[])
 {
-
-	//-------------------
-	string surffile="E:\work_jdq\RCAAEF\train\rcaaef_32_img00\whs_lab_image205surf.nii.gz";
-	string resultname="E:\work_jdq\RCAAEF\train\rcaaef_32_img00\whs_lab_image205mesh.stl";
-	vtkSmartPointer<vtkImageReader> reader =
-    vtkSmartPointer<vtkImageReader>::New();
-  vtkSmartPointer<vtkImageThreshold> selector =
-	  vtkSmartPointer<vtkImageThreshold>::New();
-  vtkSmartPointer<vtkDiscreteMarchingCubes> discreteCubes =
-    vtkSmartPointer<vtkDiscreteMarchingCubes>::New(); //marching cubes是经过处理之后的二值图，discrete marching cubes是没有经过处理的原始label
-  vtkSmartPointer<vtkWindowedSincPolyDataFilter> smoother =
-    vtkSmartPointer<vtkWindowedSincPolyDataFilter>::New();
-  vtkSmartPointer<vtkSTLWriter> stlwriter =
-	  vtkSmartPointer<vtkSTLWriter>::New();
-
-
-  // Define all of the variables
-  unsigned int startLabel = 0;
-  unsigned int endLabel = 1;
-  unsigned int smoothingIterations = 15;
-  double passBand = 0.001;
-  double featureAngle = 120.0;
-
-
-  reader->SetFileName(surffile.c_str());
-  reader->Update();
-
-  //Generate mesh
-  discreteCubes->SetInputConnection(reader->GetOutputPort());
-  discreteCubes->GenerateValues(
-	  endLabel - startLabel + 1, startLabel, endLabel);
-  discreteCubes->Update();
-
-  //smooth
-  smoother->SetInputConnection(discreteCubes->GetOutputPort());
-  smoother->SetNumberOfIterations(smoothingIterations);
-  smoother->BoundarySmoothingOff();
-  smoother->FeatureEdgeSmoothingOff();
-  smoother->SetFeatureAngle(featureAngle);
-  smoother->SetPassBand(passBand);
-  smoother->NonManifoldSmoothingOn();
-  smoother->NormalizeCoordinatesOn();
-  smoother->Update();
-
-    stlwriter->SetInputConnection(smoother->GetOutputPort());
-  stlwriter->SetFileTypeToASCII();
-  stlwriter->SetFileName(resultname.c_str());//save stl file
-  stlwriter->Write();
-
-  //stlwriter->SetInputConnection(smoother->GetOutputPort());
-  //stlwriter->SetFileTypeToASCII();
-  //stlwriter->SetFileName(mesh_name.c_str());//save stl file
-  //stlwriter->Write();
+	//-----------------------test simple codd----------------------
+	vector<float>vrandrad;
+	int nptofonepoint=100;
+	float frad=2.5;
+	Generate_gaussianrad_web(nptofonepoint,frad,vrandrad);
 
 
 
+	//-------------------from lilei-----------------------------------------------------------------
+	//string surffile="E:\work_jdq\RCAAEF\train\rcaaef_32_img00\whs_lab_image205surf.nii.gz";
+	//string resultname="E:\work_jdq\RCAAEF\train\rcaaef_32_img00\whs_lab_image205mesh.stl";
+	//vtkSmartPointer<vtkImageReader> reader =
+ //   vtkSmartPointer<vtkImageReader>::New();
+ // vtkSmartPointer<vtkImageThreshold> selector =
+	//  vtkSmartPointer<vtkImageThreshold>::New();
+ // vtkSmartPointer<vtkDiscreteMarchingCubes> discreteCubes =
+ //   vtkSmartPointer<vtkDiscreteMarchingCubes>::New(); //marching cubes是经过处理之后的二值图，discrete marching cubes是没有经过处理的原始label
+ // vtkSmartPointer<vtkWindowedSincPolyDataFilter> smoother =
+ //   vtkSmartPointer<vtkWindowedSincPolyDataFilter>::New();
+ // vtkSmartPointer<vtkSTLWriter> stlwriter =
+	//  vtkSmartPointer<vtkSTLWriter>::New();
+
+
+ // // Define all of the variables
+ // unsigned int startLabel = 0;
+ // unsigned int endLabel = 1;
+ // unsigned int smoothingIterations = 15;
+ // double passBand = 0.001;
+ // double featureAngle = 120.0;
+
+
+ // reader->SetFileName(surffile.c_str());
+ // reader->Update();
+
+ // //Generate mesh
+ // discreteCubes->SetInputConnection(reader->GetOutputPort());
+ // discreteCubes->GenerateValues(
+	//  endLabel - startLabel + 1, startLabel, endLabel);
+ // discreteCubes->Update();
+
+ // //smooth
+ // smoother->SetInputConnection(discreteCubes->GetOutputPort());
+ // smoother->SetNumberOfIterations(smoothingIterations);
+ // smoother->BoundarySmoothingOff();
+ // smoother->FeatureEdgeSmoothingOff();
+ // smoother->SetFeatureAngle(featureAngle);
+ // smoother->SetPassBand(passBand);
+ // smoother->NonManifoldSmoothingOn();
+ // smoother->NormalizeCoordinatesOn();
+ // smoother->Update();
+
+ //   stlwriter->SetInputConnection(smoother->GetOutputPort());
+ // stlwriter->SetFileTypeToASCII();
+ // stlwriter->SetFileName(resultname.c_str());//save stl file
+ // stlwriter->Write();
+
+
+  //---------------------------------------------------------------------------
 
 
 

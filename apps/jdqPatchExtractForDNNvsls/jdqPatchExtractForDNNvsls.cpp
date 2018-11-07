@@ -197,6 +197,35 @@ bool BoundaryCorrect(int *PointPos,int ImgNewVslsSize[4])
 	}
 	return true;
 }
+bool ReadDireTxt(const char *chFileName, vector<PointCordTypeDef> &PointCord)
+{
+	if (chFileName == NULL)
+	{
+		cout << "Cannot find txt-file!" << endl;
+		return 1;
+	}
+	//按照jda point格式读取line文件
+	std::vector<jdq2017::point3D>ref;
+	if ( ! jdq2017::readCenterline(chFileName, ref))
+	{
+		std::cerr << "Error in direction data" << std::endl;
+		return 1;
+	}
+	//将ref points 的数据转存成PointCord
+	if (!PointCord.empty())
+	{
+		PointCord.clear();
+	}
+	PointCordTypeDef strctTempPoint;
+	for (int i = 0; i < ref.size(); i++)
+	{
+		strctTempPoint.x =ref[i]._x;
+		strctTempPoint.y =ref[i]._y;
+		strctTempPoint.z =ref[i]._z;
+		PointCord.push_back(strctTempPoint);
+	}
+	return true;
+}
 
 
 bool ReadCurve(string strCurvename,std::vector<jdq2017::point3D>&vcurveponts)
@@ -218,7 +247,34 @@ bool ResampleCurve(std::vector<jdq2017::point3D>&vcurveponts,float fresamle)
 	vcurveponts=Respler.resultPath();
 	return true;
 }
+float Calc_probOfPont(float PointWorldCor[3],vector<PointCordProbTypeDef>&vPointCentCord)
+{
+	//计算到最近金标中心点的距离
+	float flambda=5;
+	float fmindist=100000;
+	int npotidx=-1;
+	for (int i=0;i<vPointCentCord.size();i++)
+	{
+		PointCordProbTypeDef cupont=vPointCentCord[i];
+		float fCenPontWord[3]={cupont.x,cupont.y,cupont.z};
+		float fdist=zxh::VectorOP_Distance(PointWorldCor,fCenPontWord,3);
+		if (fdist<fmindist)
+		{
+			fmindist=fdist;
+			npotidx=i;
 
+		}
+	}
+	float fmaxrad=vPointCentCord[npotidx].pr;
+	float fexp=exp((-1*fmindist+fmaxrad)*flambda);
+	float fproba=1-1/(1+fexp);
+	if(fproba==0)
+	{
+		int x=0;
+	}
+
+	return fproba;
+}
 
 //这个函数是用来生成沿着中心线切向取patch
 bool LGeneratePatchExtractByWorldWithRandOffset(int PatchNumIdex,float fdivec[3][3],float InputOutputWorldCoord[], int PatchSize[],zxhImageData &IntensityImage,zxhImageData* PatchImageArray[3])
@@ -383,7 +439,95 @@ int GeneratePontsset(zxhImageData &LabelImage,vector<PointCordTypeDef>&vPointCor
 				}
 				return vPointCord.size();
 }
-int GenerateVesCentPontsPrbset(zxhImageData &LabelImage,zxhImageData &LabelradImage,vector<PointCordProbTypeDef>&vPointCord)
+
+int GenerateVesCentPontsPrbset_Mask(zxhImageData &LabelImage,vector<PointCordProbTypeDef>&vPointCentCord,vector<PointCordProbTypeDef>&vPointCord,short *shMask)
+{
+	int ImgNewSize[4]={0,0,0,0};
+	LabelImage.GetImageSize(ImgNewSize[0],ImgNewSize[1],ImgNewSize[2],ImgNewSize[3]);
+	int ImgSize[3]={ImgNewSize[0],ImgNewSize[1],ImgNewSize[2]};
+	for(int it=0;it<ImgNewSize[3];++it)
+		for(int iz=0;iz<ImgNewSize[2];++iz)
+			for(int iy=0;iy<ImgNewSize[1];++iy)
+				for(int ix=0;ix<ImgNewSize[0];++ix)
+				{
+					short intlabinte=LabelImage.GetPixelGreyscale(ix,iy,iz,it);
+					float PointWorldCor[3]={ix,iy,iz};	
+					LabelImage.GetImageInfo()->ImageToWorld(PointWorldCor);
+					PointCordProbTypeDef Ponttemp;
+					Ponttemp.x=PointWorldCor[0];
+					Ponttemp.y=PointWorldCor[1];
+					Ponttemp.z=PointWorldCor[2];
+					if (intlabinte!=1) continue;
+					if(intlabinte==1)
+					{
+						float fbprob=Calc_probOfPont(PointWorldCor,vPointCentCord);
+						Ponttemp.pr=fbprob;
+						vPointCord.push_back(Ponttemp);
+						//标记已经取过；
+						int npd[3]={Ponttemp.x,Ponttemp.y,Ponttemp.z};
+						int np=-1;
+						TransDatanum2Greynum(npd,np,ImgSize);
+						shMask[np]=1;
+					}
+
+				}
+				return vPointCord.size();
+}
+int GenerateVesCentPontsPrbset(zxhImageData &LabelImage,vector<PointCordProbTypeDef>&vPointCentCord,vector<PointCordProbTypeDef>&vPointCord)
+{
+	int ImgNewSize[4]={0,0,0,0};
+	LabelImage.GetImageSize(ImgNewSize[0],ImgNewSize[1],ImgNewSize[2],ImgNewSize[3]);
+	int ImgSize[3]={ImgNewSize[0],ImgNewSize[1],ImgNewSize[2]};
+	for(int it=0;it<ImgNewSize[3];++it)
+		for(int iz=0;iz<ImgNewSize[2];++iz)
+			for(int iy=0;iy<ImgNewSize[1];++iy)
+				for(int ix=0;ix<ImgNewSize[0];++ix)
+				{
+					short intlabinte=LabelImage.GetPixelGreyscale(ix,iy,iz,it);
+					float PointWorldCor[3]={ix,iy,iz};	
+					LabelImage.GetImageInfo()->ImageToWorld(PointWorldCor);
+					PointCordProbTypeDef Ponttemp;
+					Ponttemp.x=PointWorldCor[0];
+					Ponttemp.y=PointWorldCor[1];
+					Ponttemp.z=PointWorldCor[2];
+					if (intlabinte!=1) continue;
+					if(intlabinte==1)
+					{
+						float fbprob=Calc_probOfPont(PointWorldCor,vPointCentCord);
+						Ponttemp.pr=fbprob;
+						vPointCord.push_back(Ponttemp);
+					}
+
+				}
+				return vPointCord.size();
+}
+int SelectPointsFromlabimg(zxhImageData &LabelImage,vector<PointCordProbTypeDef>&vPointCord,int nlab)
+{
+	int ImgNewSize[4]={0,0,0,0};
+	LabelImage.GetImageSize(ImgNewSize[0],ImgNewSize[1],ImgNewSize[2],ImgNewSize[3]);
+	for(int it=0;it<ImgNewSize[3];++it)
+		for(int iz=0;iz<ImgNewSize[2];++iz)
+			for(int iy=0;iy<ImgNewSize[1];++iy)
+				for(int ix=0;ix<ImgNewSize[0];++ix)
+				{
+					short intlabinte=LabelImage.GetPixelGreyscale(ix,iy,iz,it);
+					float PointWorldCor[3]={ix,iy,iz};	
+					LabelImage.GetImageInfo()->ImageToWorld(PointWorldCor);
+					PointCordProbTypeDef Ponttemp;
+					Ponttemp.x=PointWorldCor[0];
+					Ponttemp.y=PointWorldCor[1];
+					Ponttemp.z=PointWorldCor[2];
+					if (intlabinte!=nlab) continue;
+					if(intlabinte==nlab)
+					{
+						Ponttemp.pr=nlab;
+						vPointCord.push_back(Ponttemp);
+					}
+
+				}
+				return vPointCord.size();
+}
+int GenerateVesCentPontsRadset(zxhImageData &LabelImage,zxhImageData &LabelradImage,vector<PointCordProbTypeDef>&vPointCord)
 {
 	int ImgNewSize[4]={0,0,0,0};
 	LabelImage.GetImageSize(ImgNewSize[0],ImgNewSize[1],ImgNewSize[2],ImgNewSize[3]);
@@ -415,29 +559,7 @@ int GenerateVesCentPontsPrbset(zxhImageData &LabelImage,zxhImageData &LabelradIm
 				}
 				return vPointCord.size();
 }
-float Calc_probOfPont(float PointWorldCor[3],vector<PointCordProbTypeDef>&vPointCentCord)
-{
-	//计算到最近金标中心点的距离
 
-	float fmindist=100000;
-	int npotidx=-1;
-	for (int i=0;i<vPointCentCord.size();i++)
-	{
-		PointCordProbTypeDef cupont=vPointCentCord[i];
-		float fCenPontWord[3]={cupont.x,cupont.y,cupont.z};
-		float fdist=zxh::VectorOP_Distance(PointWorldCor,fCenPontWord,3);
-		if (fdist<fmindist)
-		{
-			fmindist=fdist;
-			npotidx=i;
-
-		}
-	}
-	float fmaxrad=vPointCentCord[npotidx].pr;
-	float fproba=zxh::maxf(1-fmindist/fmaxrad,0);
-
-	return fproba;
-}
 int GenerateVesBoudPontsPrbset(zxhImageData &LabelImage,vector<PointCordProbTypeDef>&vPointCentCord,vector<PointCordProbTypeDef>&vPointBoundCord)
 {
 	float fboud=5;
@@ -592,10 +714,35 @@ int GetNonVesPontsset(zxhImageData &LabelImage,zxhImageData &ROIImage,vector<Poi
 				}
 				return vNonVesPointCord.size();
 }
+
+double generateGaussianNoise(double mu, double sigma)
+{
+	const double epsilon = 1.17549e-038;
+	const double two_pi = 2.0*3.14159265358979323846;
+
+	static double z0, z1;
+	static bool generate;
+	generate = !generate;
+
+	if (!generate)
+		return z1 * sigma + mu;
+
+	double u1, u2;
+	do
+	{
+		u1 = rand() * (1.0 / RAND_MAX);
+		u2 = rand() * (1.0 / RAND_MAX);
+	}
+	while ( u1 <= epsilon );
+
+	z0 = sqrt(-2.0 * log(u1)) * cos(two_pi * u2);
+	z1 = sqrt(-2.0 * log(u1)) * sin(two_pi * u2);
+	return z0 * sigma + mu;
+}
 bool Generate_gaussianrad(int nptofonepoint,float frad,vector<float>&vrandrad)
 {	
 
-	float maxrad=3.5*frad;
+	float maxrad=1.5*frad;
 	vrandrad.clear();
 	float epsilon =0.01;
 	srand((unsigned)time(NULL));
@@ -610,8 +757,8 @@ bool Generate_gaussianrad(int nptofonepoint,float frad,vector<float>&vrandrad)
 		fprob=zxh::Gaussian(float (randrad),float(0),float(maxrad));
 		if (fprob>= epsilon)
 		{
-			vrandrad.push_back(frad+randrad);
-			if (vrandrad.size()>nptofonepoint)
+			vrandrad.push_back(0.5+frad+randrad);//超过一个spacing
+			if (vrandrad.size()>=nptofonepoint)
 			{
 				break;
 			}
@@ -620,13 +767,36 @@ bool Generate_gaussianrad(int nptofonepoint,float frad,vector<float>&vrandrad)
 
 	return true;
 }
-bool GetNonVesPontsset_GaussDistri(int nnonvptsize,vector<PointCordProbTypeDef>&vVesCentPointCord,zxhImageData &LabelImage,zxhImageData &ROIImage,vector<PointCordProbTypeDef>&vNonVesPointCord)
-{
-	//
+bool Generate_gaussianrad_web(int nptofonepoint,float frad,vector<float>&vrandrad)
+{	
 
+	float maxrad=5*frad;
+	vrandrad.clear();
+	float epsilon =0.01;
+	srand((unsigned)time(NULL));
+	float fprob=100000;
+	if (maxrad==0)
+	{
+		int x=0;
+	}
+	while (1)
+	{
+		float fgrad =generateGaussianNoise(0,maxrad/3);
+		vrandrad.push_back(0.5+abs(fgrad));//超过一个spacing
+		if (vrandrad.size()>=nptofonepoint)
+		{
+			break;
+		}
+
+	}
+
+	return true;
+}
+bool GetOffCentVesPontsset_GaussDistri(int nnonvptsize,vector<PointCordProbTypeDef>&vVesCentPointCord,zxhImageData &LabelImage,zxhImageData &ROIImage,vector<PointCordProbTypeDef>&vNonVesPointCord)
+{
+	//定义x,y,z坐标轴的方向
 
 	float fdivec[3][3]={0};
-
 	//x方向
 	fdivec[0][0]=1;
 	fdivec[0][1]=0;
@@ -641,7 +811,7 @@ bool GetNonVesPontsset_GaussDistri(int nnonvptsize,vector<PointCordProbTypeDef>&
 	fdivec[2][0]=0;
 	fdivec[2][1]=0;
 	fdivec[2][2]=1;
-
+	//将所要挑选的offcentline的点平均分布到每个中心点上
 	int nptofonepoint=nnonvptsize/vVesCentPointCord.size();
 	for(int i=0;i<vVesCentPointCord.size();i++)
 	{
@@ -656,7 +826,7 @@ bool GetNonVesPontsset_GaussDistri(int nnonvptsize,vector<PointCordProbTypeDef>&
 		{
 			int x=0;
 		}
-		Generate_gaussianrad(nptofonepoint,frad,vrandrad);
+		Generate_gaussianrad_web(nptofonepoint,frad,vrandrad);
 		///------------------将每一个随机产生的长度给一个随机向量，
 		for(int nrad=0;nrad<vrandrad.size();nrad++)
 		{
@@ -696,13 +866,223 @@ bool GetNonVesPontsset_GaussDistri(int nnonvptsize,vector<PointCordProbTypeDef>&
 				short shlabnum=LabelImage.GetPixelGreyscale(nscx, nscy, nscz, 0);
 				short shroinum=ROIImage.GetPixelGreyscale(nscx, nscy, nscz, 0);
 				if (shroinum==0) continue;//只选ROI里的点
-				if (shlabnum!=0) continue;//只选label 0的点
+				if (shlabnum!=0) continue;//不选label 1,label2里的点
 				PointCordProbTypeDef Ponttemp;
 				Ponttemp.x=InputWorldCoord_x;
 				Ponttemp.y=InputWorldCoord_y;
 				Ponttemp.z=InputWorldCoord_z;
 				float fbprob=Calc_probOfPont(InputWorldCoord,vVesCentPointCord);
 				Ponttemp.pr=fbprob;
+				if(fbprob>1)
+				{
+					int x=0;
+				}
+				vNonVesPointCord.push_back(Ponttemp);
+				break;
+
+			}
+		}
+
+	}
+	return true;
+}
+
+bool GetOffCentVesPontsset_GaussDistri_Mask(int nnonvptsize,vector<PointCordProbTypeDef>&vVesCentPointCord,zxhImageData &LabelImage,zxhImageData &ROIImage,vector<PointCordProbTypeDef>&vNonVesPointCord,vector<PointCordTypeDef>vDisDir,short *shMask)
+{
+	//获取图像大小
+	int ImgSize[4]={0,0,0,0};
+	LabelImage.GetImageSize(ImgSize[0],ImgSize[1],ImgSize[2],ImgSize[3]);
+	//定义x,y,z坐标轴的方向
+
+	float fdivec[3][3]={0};
+	//x方向
+	fdivec[0][0]=1;
+	fdivec[0][1]=0;
+	fdivec[0][2]=0;
+
+	//y方向
+	fdivec[1][0]=0;
+	fdivec[1][1]=1;
+	fdivec[1][2]=0;
+
+	//z方向
+	fdivec[2][0]=0;
+	fdivec[2][1]=0;
+	fdivec[2][2]=1;
+	//将所要挑选的offcentline的点平均分布到每个中心点上
+	int nptofonepoint=nnonvptsize/vVesCentPointCord.size();
+	for(int i=0;i<vVesCentPointCord.size();i++)
+	{
+		//获取当前点
+		PointCordProbTypeDef Pcurpon;
+		Pcurpon=vVesCentPointCord[i];
+		//
+		//--------------------随机产生一个正态分布的半径长度
+		float frad=Pcurpon.pr;
+		vector<float>vrandrad;
+		if (frad==0)
+		{
+			int x=0;
+		}
+		Generate_gaussianrad_web(nptofonepoint,frad,vrandrad);
+		///------------------将每一个随机产生的长度给一个随机向量，
+		for(int nrad=0;nrad<vrandrad.size();nrad++)
+		{
+			float randradius=vrandrad[nrad];
+			while(1)
+			{
+				//打乱球面向量
+				random_shuffle(vDisDir.begin(), vDisDir.end());
+				int numofPoints=0;
+				for(int nd=0;nd<vDisDir.size();nd++)
+				{
+					//--------------------随机产生一个向量(单位球面上)--------------------
+
+					float fsumvec[3]={vDisDir[nd].x,vDisDir[nd].y,vDisDir[nd].z};
+					//Rand shift
+					zxh::VectorOP_Normalise(fsumvec,3);
+
+					float InputWorldCoord_x = Pcurpon.x + randradius*fsumvec[0];
+					float InputWorldCoord_y = Pcurpon.y + randradius*fsumvec[1];
+					float InputWorldCoord_z = Pcurpon.z + randradius*fsumvec[2];
+					//
+					float InputWorldCoord[3]={InputWorldCoord_x,InputWorldCoord_y,InputWorldCoord_z};
+					float InputNeiNodeWorldCoord[4]={InputWorldCoord_x,InputWorldCoord_y,InputWorldCoord_z,0 };
+					LabelImage.GetImageInfo()->WorldToImage(InputNeiNodeWorldCoord);
+					int nscx = zxh::round(InputNeiNodeWorldCoord[0]);
+					int nscy = zxh::round(InputNeiNodeWorldCoord[1]);
+					int nscz = zxh::round(InputNeiNodeWorldCoord[2]);
+					bool bIsInsideImage = LabelImage.InsideImage(nscx, nscy, nscz, 0); // 超过图像边界的，不给予考虑，也就是说，默认为normal myo
+					if (!bIsInsideImage)
+					{
+						std::cout << "warning: niebour node of point"<< i<< "is not inside image " << "\n"; //-----------------
+						continue;
+					}
+					//判断是否已经取过
+					int np[3]={nscx,nscy,nscz};
+					int npt=-1;
+					TransDatanum2Greynum(np,npt,ImgSize);
+					short shortmas=shMask[npt];
+					short shortROI=ROIImage.GetPixelGreyscale(nscx,nscy,nscz,0);
+					if (shortmas==1) continue;//这个点取过了就不取
+					if (shortROI==0) continue;//只选ROI里的点
+
+					PointCordProbTypeDef Ponttemp;
+					Ponttemp.x=InputWorldCoord_x;
+					Ponttemp.y=InputWorldCoord_y;
+					Ponttemp.z=InputWorldCoord_z;
+					float fbprob=Calc_probOfPont(InputWorldCoord,vVesCentPointCord);
+					Ponttemp.pr=fbprob;
+					if(fbprob>1)
+					{
+						int x=0;
+					}
+					vNonVesPointCord.push_back(Ponttemp);
+					numofPoints++;
+					break;
+
+				}//for
+				if(numofPoints==0)//整个球内的点都没有取到
+				{
+					cout<<"the radius is too small"<<endl;
+					randradius=randradius+0.5;
+				}
+				else
+				{
+					break;//while
+				}
+			}//while
+		}//for
+
+	}
+	return true;
+}
+bool GetNonVesPontsset_GaussDistri(int nnonvptsize,vector<PointCordProbTypeDef>&vVesCentPointCord,zxhImageData &LabelImage,zxhImageData &ROIImage,vector<PointCordProbTypeDef>&vNonVesPointCord)
+{
+	//
+
+	float fdivec[3][3]={0};
+
+	//x方向
+	fdivec[0][0]=1;
+	fdivec[0][1]=0;
+	fdivec[0][2]=0;
+
+	//y方向
+	fdivec[1][0]=0;
+	fdivec[1][1]=1;
+	fdivec[1][2]=0;
+
+	//z方向
+	fdivec[2][0]=0;
+	fdivec[2][1]=0;
+	fdivec[2][2]=1;
+
+	int nptofonepoint=nnonvptsize/vVesCentPointCord.size();
+	for(int i=0;i<vVesCentPointCord.size();i++)
+	{
+		//获取当前点
+		PointCordProbTypeDef Pcurpon;
+		Pcurpon=vVesCentPointCord[i];
+		//
+		//--------------------随机产生一个正态分布的半径长度
+		float frad=Pcurpon.pr;
+		vector<float>vrandrad;
+		if (frad==0)
+		{
+			int x=0;
+		}
+		Generate_gaussianrad_web(nptofonepoint,frad,vrandrad);
+		///------------------将每一个随机产生的长度给一个随机向量，
+		for(int nrad=0;nrad<vrandrad.size();nrad++)
+		{
+			float randradius=vrandrad[nrad];
+			srand((unsigned)time(NULL));  
+			while (1)
+			{
+
+				//--------------------随机产生一个向量--------------------
+				float randoffset1 =float((rand() % (200))-100) / 100.0;	
+				float randoffset2 =float((rand() % (200))-100) / 100.0;	
+				float randoffset3=float((rand() % (200))-100) / 100.0;	
+
+				float fvec1[3]={randoffset1*fdivec[0][0],randoffset1*fdivec[0][1],randoffset1*fdivec[0][2]};
+				float fvec2[3]={randoffset2*fdivec[1][0],randoffset2*fdivec[1][1],randoffset2*fdivec[1][2]};
+				float fvec3[3]={randoffset3*fdivec[2][0],randoffset3*fdivec[2][1],randoffset3*fdivec[2][2]};
+				float fsumvec[3]={fvec1[0]+fvec2[0]+fvec3[0],fvec1[1]+fvec2[1]+fvec3[1],fvec1[2]+fvec2[2]+fvec3[2]};
+				//Rand shift
+				zxh::VectorOP_Normalise(fsumvec,3);
+
+				float InputWorldCoord_x = Pcurpon.x + randradius*fsumvec[0];
+				float InputWorldCoord_y = Pcurpon.y + randradius*fsumvec[1];
+				float InputWorldCoord_z = Pcurpon.z + randradius*fsumvec[2];
+				//
+				float InputWorldCoord[3]={InputWorldCoord_x,InputWorldCoord_y,InputWorldCoord_z};
+				float InputNeiNodeWorldCoord[4]={InputWorldCoord_x,InputWorldCoord_y,InputWorldCoord_z,0 };
+				LabelImage.GetImageInfo()->WorldToImage(InputNeiNodeWorldCoord);
+				int nscx = zxh::round(InputNeiNodeWorldCoord[0]);
+				int nscy = zxh::round(InputNeiNodeWorldCoord[1]);
+				int nscz = zxh::round(InputNeiNodeWorldCoord[2]);
+				bool bIsInsideImage = LabelImage.InsideImage(nscx, nscy, nscz, 0); // 超过图像边界的，不给予考虑，也就是说，默认为normal myo
+				if (!bIsInsideImage)
+				{
+					std::cout << "warning: niebour node of point"<< i<< "is not inside image " << "\n"; //-----------------
+					continue;
+				}
+				short shlabnum=LabelImage.GetPixelGreyscale(nscx, nscy, nscz, 0);
+				short shroinum=ROIImage.GetPixelGreyscale(nscx, nscy, nscz, 0);
+				if (shroinum==0) continue;//只选ROI里的点
+				if (shlabnum!=0) continue;//不选label 1,label2里的点
+				PointCordProbTypeDef Ponttemp;
+				Ponttemp.x=InputWorldCoord_x;
+				Ponttemp.y=InputWorldCoord_y;
+				Ponttemp.z=InputWorldCoord_z;
+				float fbprob=Calc_probOfPont(InputWorldCoord,vVesCentPointCord);
+				Ponttemp.pr=fbprob;
+				if(fbprob>1)
+				{
+					int x=0;
+				}
 				vNonVesPointCord.push_back(Ponttemp);
 				break;
 
@@ -737,8 +1117,9 @@ bool GetNonVesPontsset_GaussDistri(int nnonvptsize,vector<PointCordProbTypeDef>&
 int main(int argc, char *argv[])
 {
 	//这个版本是用来抓取patch，和media18 J.W文章类似
+	//但是只有on line 和 offline
 
-	if( argc < 5 )
+	if( argc < 6)
 	{
 		cerr << "Usage: " << endl;
 		cerr << "jdqPatchExtractForTrain	curve	image  labimag pathinfor " << endl;
@@ -749,21 +1130,24 @@ int main(int argc, char *argv[])
 	string strlabImg =string(argv[2]);
 	string strlabradImg =string(argv[3]);
 	string strROIImg =string(argv[4]); 
-	string SavePathname = string(argv[5]);  
-	string trainortest = string(argv[6]);  
+	string strDisDir=string(argv[5]);  
+	string SavePathname = string(argv[6]);  
+	string trainortest = string(argv[7]);  
 
 
 	//--------------------------------------
-	//string strintImg ="G:/work_jdq/for_DNN_vsls_v3/data/whole_GT_reorient/dataset05/image.nii.gz";
-	//string strlabImg ="G:/work_jdq/for_DNN_vsls_v3/data/whole_GT_reorient/dataset05/lab_image12.nii.gz";
-	//string strlabradImg ="G:/work_jdq/for_DNN_vsls_v3/data/whole_GT_reorient/dataset05/lab_image1_rad.nii.gz";
-	//string strROIImg ="G:/work_jdq/for_DNN_vsls_v3/data/whole_GT_reorient/dataset05/whs_lab_image_ROI.nii.gz";
-	//string SavePathname ="G:/work_jdq/for_DNN_vsls_v3/infiles/Patch_data/dataset01/";
+	//if(argc<6) int x=0;
+	//string strintImg ="G:/work_jdq/for_DNN_vsls_v5/data/whole_GT_reorient/dataset01/image.nii.gz";
+	//string strlabImg ="G:/work_jdq/for_DNN_vsls_v5/data/whole_GT_reorient/dataset01/lab_image.nii.gz";
+	//string strlabradImg ="G:/work_jdq/for_DNN_vsls_v5/data/whole_GT_reorient/dataset01/lab_image1_rad.nii.gz";
+	//string strROIImg ="G:/work_jdq/for_DNN_vsls_v5/data/whole_GT_reorient/dataset01/whs_lab_image_ROI.nii.gz";
+	//string strDisDir="G:/work_jdq/for_DNN_vsls_v5/data/Otherdata/dispersedDirectionsSphere500.txt";
+	//string SavePathname ="G:/work_jdq/for_DNN_vsls_v5/infiles/Patchdata/dataset01/";
 	//string trainortest = "-train";  
 
-	//---------------相关参数设置---------------
-	int HalfPatchLength = 9;
-	int N =9;
+	//---------------patch大小相关参数设置---------------
+	int HalfPatchLength = 2;
+	int N =2;
 
 
 	srand((unsigned)time(NULL));
@@ -778,6 +1162,11 @@ int main(int argc, char *argv[])
 	zxh::OpenImageSafe(&LabelImage,strlabImg);
 	////读取label rad image
 	zxh::OpenImageSafe(&LabelradImage,strlabradImg);
+	//读取单位球离散化向量
+	vector<PointCordTypeDef>vDisDir;
+	const char *chDisDir=strDisDir.c_str();
+	ReadDireTxt(chDisDir,vDisDir);
+
 	int PatchInfo[4] = { N, HalfPatchLength, 0, 0 };
 	float spacing111[] = { 1, 1, 1, 1 }; 
 	float fdivec[3][3]={0};
@@ -802,28 +1191,37 @@ int main(int argc, char *argv[])
 		zxhImageDataT<short>  ROIImage;
 		//读取ROI image
 		zxh::OpenImageSafe(&ROIImage,strROIImg);
+		//-----------------------------------------------读取label image， 并对各个label 的点数统计
+		vector<PointCordProbTypeDef> vlab1,vlab2,vlab3;
+		//label 1
+		int numlab1=SelectPointsFromlabimg(LabelImage,vlab1,1);
+		int numlab2=SelectPointsFromlabimg(LabelImage,vlab1,2);
+		int numlab3=SelectPointsFromlabimg(LabelImage,vlab1,3);
 		//-----------------读取label image,并产生正负样本的patch的中心点---------------------------
-		vector<PointCordProbTypeDef> vVesCentPointCord,vVesCentPointCordrad;//金标准点，概率为1
-		int nvcptsize=GenerateVesCentPontsPrbset(LabelImage,LabelradImage,vVesCentPointCord);
-		vVesCentPointCordrad.assign( vVesCentPointCord.begin(),vVesCentPointCord.end());
-		vector<PointCordProbTypeDef> vVesNearBoundPointCord;//稍近边界点，label2，概率为距离的函数
-		int nvnbptsize=GenerateVesNearBoudPontsPrbset(LabelImage,vVesCentPointCord,vVesNearBoundPointCord);
-		//合并正样本
-		vector<PointCordProbTypeDef> vVesPointCord;
-		vVesPointCord.insert(vVesPointCord.end(),vVesCentPointCord.begin(),vVesCentPointCord.end());
-		vVesPointCord.insert(vVesPointCord.end(),vVesNearBoundPointCord.begin(),vVesNearBoundPointCord.end());
-		int nvptsize=vVesPointCord.size();
+		//首先产生一个mask，用来记录已经取过的点（没取过的点为0， 取过1）
+		int n=0;
+		int ImgSizeraw[]={0,0,0,0};
+		IntensityImage.GetImageSize(ImgSizeraw[0],ImgSizeraw[1],ImgSizeraw[2],ImgSizeraw[3]);
+		short *shMask=new short[ImgSizeraw[0]*ImgSizeraw[1]*ImgSizeraw[2]-1];
+		for (int i = 0; i < ImgSizeraw[0]*ImgSizeraw[1]*ImgSizeraw[2]-1; i ++)shMask[i]=0;
+		//读取中心点的坐标
+		vector<PointCordProbTypeDef> vVesCentPointCord,vVesCentPointCordrad;//金标准点，概率为1,online
+		int nvcp=GenerateVesCentPontsRadset(LabelImage,LabelradImage,vVesCentPointCordrad);
+		int nvcptsize=GenerateVesCentPontsPrbset_Mask(LabelImage,vVesCentPointCordrad,vVesCentPointCord,shMask);
 
-		float labbal=1;//labbal=负样本数量/正样本数量
-		//挑选负样本
-		int nnonvptsize=nvptsize*labbal;
-		vector<PointCordProbTypeDef> vSelecNovVesPointCord;//更远的边界点，以中心线为基准，正太分布，并在ROI内部
-		GetNonVesPontsset_GaussDistri(nnonvptsize,vVesCentPointCordrad,LabelImage,ROIImage,vSelecNovVesPointCord);
+		float labbal=10;//labbal=offline数量/正online数量
+		//挑选offline
+		int noffvptsize=nvcptsize*labbal;
+		vector<PointCordProbTypeDef> vSelecOffSetPointCord;//挑选offcent的点，以中心线为基准，数量呈正太分布，并在ROI内部；每点的概率符合一个设计好的函数分布
+
+		GetOffCentVesPontsset_GaussDistri_Mask(noffvptsize,vVesCentPointCordrad,LabelImage,ROIImage,vSelecOffSetPointCord,vDisDir,shMask);
 
 		vector<PointCordProbTypeDef>vPointCord;
 		//将正负样本合并，加入到容器中
-		vPointCord.insert(vPointCord.end(),vVesPointCord.begin(),vVesPointCord.end());
-		vPointCord.insert(vPointCord.end(),vSelecNovVesPointCord.begin(),vSelecNovVesPointCord.end());
+		vPointCord.insert(vPointCord.end(),vVesCentPointCord.begin(),vVesCentPointCord.end());
+		cout<<"Number of Center Points: "<<vVesCentPointCord.size()<<endl;
+		vPointCord.insert(vPointCord.end(),vSelecOffSetPointCord.begin(),vSelecOffSetPointCord.end());
+		cout<<"Number of Off Center Points: "<<vSelecOffSetPointCord.size()<<endl;
 		//将所有预备取patch的点打乱
 		random_shuffle(vPointCord.begin(), vPointCord.end());
 		int nsize=vPointCord.size();
@@ -878,6 +1276,10 @@ int main(int argc, char *argv[])
 
 				}
 				PatchNumIdex++;
+				if (tempcurgroupponts[ptid].pr>1)
+				{
+					int x=0;
+				}
 				outfile_norm << PatchNumIdex << " " << tempcurgroupponts[ptid].pr<< "\n";
 			}
 			outfile_norm.close();
@@ -891,100 +1293,197 @@ int main(int argc, char *argv[])
 	}
 	if (strcmp(trainortest.c_str(),"-test")==0)
 	{
-		////这是用来在testing data中取所有的patch
-		////为了加速，挑选一定的层，并将层内划分为4*4个分块
-		//int ImgSizeraw[]={0,0,0,0};
-		//IntensityImage.GetImageSize(ImgSizeraw[0],ImgSizeraw[1],ImgSizeraw[2],ImgSizeraw[3]);
-		//int numofPatch=ImgSizeraw[2];
-		////
-		//int numfenkuai=1;
-		//int slecnumofPatch=1;
-		//int PatchNumIdex=0;
-		//for (int i=0;i<numofPatch;i=i+slecnumofPatch)
-		//{
-		//	vector<PointCordTypeDef>vPointCord;
-
-		//	for (int XN=0;XN<numfenkuai;XN++)
-		//		for (int YN=0;YN<numfenkuai;YN++)
-		//		{
-		//			vPointCord.clear();
-		//			int XNStart=XN*ImgSizeraw[0]/numfenkuai;
-		//			int YNStart=YN*ImgSizeraw[1]/numfenkuai;
-		//			PatchNumIdex=0;
-		//			string SavePatchinfo=SavePathname+"Patchinfo_"+num2str(i)+"_" +num2str(YN)+"_"+num2str(XN)+".txt";
-		//			ofstream outfile_norm(SavePatchinfo, ios::beg);//output
-		//			for (int j=YNStart;j<YNStart+ImgSizeraw[1]/numfenkuai;j++)
-		//				for (int k=XNStart;k<XNStart+ImgSizeraw[0]/numfenkuai;k++)
-		//				{
-
-		//					float curvpointsWolrd[] = { k,j,i, 0 };
-		//					IntensityImage.GetImageInfo()->ImageToWorld(curvpointsWolrd);//物理坐标转成图像坐标
-		//					PointCordTypeDef TempPoint;
-		//					TempPoint.x =curvpointsWolrd[0];
-		//					TempPoint.y =curvpointsWolrd[1];
-		//					TempPoint.z =curvpointsWolrd[2];
-		//					vPointCord.push_back(TempPoint);
-
-		//				}
-		//				int npt=vPointCord.size();
-		//				outfile_norm << npt<<" "<<0<< "\n";
-		//				zxhImageDataT<short> PatchImage1,PatchImage2,PatchImage3;
-		//				int P_newsize[] = { SiglePatchSize,npt , 1, 1 };
-		//				PatchImage1.NewImage(2, P_newsize, spacing111, IntensityImage.GetImageInfo());
-		//				PatchImage2.NewImage(2, P_newsize, spacing111, IntensityImage.GetImageInfo());
-		//				PatchImage3.NewImage(2, P_newsize, spacing111, IntensityImage.GetImageInfo());
-		//				zxhImageData* PatchImageArray[3]={&PatchImage1,&PatchImage2,&PatchImage3};
 
 
-		//				//生成一个patch
-		//				for(int ptid=0;ptid<vPointCord.size();ptid++)
-		//				{
-		//					//获取当前点的patch
-		//					float InputWorldCoord[4] ={ vPointCord[ptid].x,  vPointCord[ptid].y,  vPointCord[ptid].z, 0 };
-		//					float inputimagecoord[4]={ vPointCord[ptid].x,  vPointCord[ptid].y,  vPointCord[ptid].z, 0 };
-		//					LabelImage.GetImageInfo()->WorldToImage(inputimagecoord);
-		//					int scx = zxh::round(inputimagecoord[0]);
-		//					int scy = zxh::round(inputimagecoord[1]);
-		//					int scz = zxh::round(inputimagecoord[2]);
-		//					float finten=LabelImage.GetPixelGreyscale(scx,scy,scz,0);
+		zxhImageDataT<short>  ROIImage;
+		//读取ROI image
+		zxh::OpenImageSafe(&ROIImage,strROIImg);
+		//读取中心点的坐标
+		vector<PointCordProbTypeDef> vVesCentPointCord,vVesCentPointCordrad;//金标准点，概率为1,online
+		int nvcp=GenerateVesCentPontsRadset(LabelImage,LabelradImage,vVesCentPointCordrad);
+		//这是用来在testing data中取所有的patch
+		//为了加速，挑选一定的层，并将层内划分为4*4个分块
+		int ImgSizeraw[]={0,0,0,0};
+		IntensityImage.GetImageSize(ImgSizeraw[0],ImgSizeraw[1],ImgSizeraw[2],ImgSizeraw[3]);
+		int numofPatch=ImgSizeraw[2];
+		//
+		int numfenkuai=4;
+		int slecnumofPatch=1;
+		int PatchNumIdex=0;
+		for (int i=0;i<numofPatch;i=i+slecnumofPatch)
+		{
+			vector<PointCordTypeDef>vPointCord;
+
+			for (int XN=0;XN<numfenkuai;XN++)
+				for (int YN=0;YN<numfenkuai;YN++)
+				{
+					vPointCord.clear();
+					int XNStart=XN*ImgSizeraw[0]/numfenkuai;
+					int YNStart=YN*ImgSizeraw[1]/numfenkuai;
+					PatchNumIdex=0;
+
+					for (int j=YNStart;j<YNStart+ImgSizeraw[1]/numfenkuai;j++)
+						for (int k=XNStart;k<XNStart+ImgSizeraw[0]/numfenkuai;k++)
+						{
+
+							short shintenROI=ROIImage.GetPixelGreyscale( k,j,i,0);
+							if (shintenROI==0)continue;
+							float curvpointsWolrd[] = { k,j,i,0 };
+							IntensityImage.GetImageInfo()->ImageToWorld(curvpointsWolrd);//物理坐标转成图像坐标
+							PointCordTypeDef TempPoint;
+							TempPoint.x =curvpointsWolrd[0];
+							TempPoint.y =curvpointsWolrd[1];
+							TempPoint.z =curvpointsWolrd[2];
+							vPointCord.push_back(TempPoint);
+
+						}
+						int npt=vPointCord.size();
+						if (npt==0)continue;
+						
+						string SavePatchinfo=SavePathname+"Patchinfo_"+num2str(i)+"_" +num2str(YN)+"_"+num2str(XN)+".txt";
+						ofstream outfile_norm(SavePatchinfo, ios::beg);//output
+						outfile_norm << npt<<" "<<0<< "\n";
+						zxhImageDataT<short> PatchImage1,PatchImage2,PatchImage3;
+						int P_newsize[] = { SiglePatchSize,npt , 1, 1 };
+						PatchImage1.NewImage(2, P_newsize, spacing111, IntensityImage.GetImageInfo());
+						PatchImage2.NewImage(2, P_newsize, spacing111, IntensityImage.GetImageInfo());
+						PatchImage3.NewImage(2, P_newsize, spacing111, IntensityImage.GetImageInfo());
+						zxhImageData* PatchImageArray[3]={&PatchImage1,&PatchImage2,&PatchImage3};
 
 
-		//					if (LGeneratePatchExtractByWorldWithRandOffset_inxyzTest(PatchNumIdex,fdivec,InputWorldCoord, PatchInfo,IntensityImage, PatchImageArray) == false)
+						//生成一个patch
+						for(int ptid=0;ptid<vPointCord.size();ptid++)
+						{
+							//获取当前点的patch
+							float InputWorldCoord[4] ={ vPointCord[ptid].x,  vPointCord[ptid].y,  vPointCord[ptid].z, 0 };
+							float inputimagecoord[4]={ vPointCord[ptid].x,  vPointCord[ptid].y,  vPointCord[ptid].z, 0 };
+							LabelImage.GetImageInfo()->WorldToImage(inputimagecoord);
+							int scx = zxh::round(inputimagecoord[0]);
+							int scy = zxh::round(inputimagecoord[1]);
+							int scz = zxh::round(inputimagecoord[2]);
+							float finten=LabelImage.GetPixelGreyscale(scx,scy,scz,0);
+
+
+							if (LGeneratePatchExtractByWorldWithRandOffset_inxyzTest(PatchNumIdex,fdivec,InputWorldCoord, PatchInfo,IntensityImage, PatchImageArray) == false)
+							{
+								continue;//
+
+							}
+							short shlabnum =LabelImage.GetPixelGreyscale(scx,scy,scz);
+							//根据train的函数设定Test金标准
+
+							float fbprob=Calc_probOfPont(InputWorldCoord,vVesCentPointCordrad);
+							PatchNumIdex++;
+							outfile_norm << PatchNumIdex << " " <<fbprob<< "\n";
+
+						}
+						outfile_norm.close();
+
+						string Str_T1 = SavePathname + "Patch_s1_"+num2str(i)+"_" +num2str(YN)+"_"+num2str(XN)+".nii.gz";
+						string Str_T2 = SavePathname + "Patch_s2_"+num2str(i)+"_" +num2str(YN)+"_"+num2str(XN)+".nii.gz";
+						string Str_T3 = SavePathname + "Patch_s3_"+num2str(i)+"_" +num2str(YN)+"_"+num2str(XN)+".nii.gz";
+						zxh::SaveImage(PatchImageArray[0], Str_T1);
+						zxh::SaveImage(PatchImageArray[1], Str_T2);
+						zxh::SaveImage(PatchImageArray[2], Str_T3);
+				}
+		}
+	}
+	if (strcmp(trainortest.c_str(),"-test_v1")==0)
+	{
+		//	//这是用来在testing data中取所有的patch
+		//	//为了加速，挑选一定的层，并将层内划分为4*4个分块
+		//	int ImgSizeraw[]={0,0,0,0};
+		//	IntensityImage.GetImageSize(ImgSizeraw[0],ImgSizeraw[1],ImgSizeraw[2],ImgSizeraw[3]);
+		//	int numofPatch=ImgSizeraw[2];
+		//	//
+		//	int numfenkuai=4;
+		//	int slecnumofPatch=1;
+		//	int PatchNumIdex=0;
+		//	for (int i=0;i<numofPatch;i=i+slecnumofPatch)
+		//	{
+		//		vector<PointCordTypeDef>vPointCord;
+
+		//		for (int XN=0;XN<numfenkuai;XN++)
+		//			for (int YN=0;YN<numfenkuai;YN++)
+		//			{
+		//				vPointCord.clear();
+		//				int XNStart=XN*ImgSizeraw[0]/numfenkuai;
+		//				int YNStart=YN*ImgSizeraw[1]/numfenkuai;
+		//				PatchNumIdex=0;
+		//				string SavePatchinfo=SavePathname+"Patchinfo_"+num2str(i)+"_" +num2str(YN)+"_"+num2str(XN)+".txt";
+		//				ofstream outfile_norm(SavePatchinfo, ios::beg);//output
+		//				for (int j=YNStart;j<YNStart+ImgSizeraw[1]/numfenkuai;j++)
+		//					for (int k=XNStart;k<XNStart+ImgSizeraw[0]/numfenkuai;k++)
 		//					{
-		//						continue;//
+
+		//						float curvpointsWolrd[] = { k,j,i, 0 };
+		//						IntensityImage.GetImageInfo()->ImageToWorld(curvpointsWolrd);//物理坐标转成图像坐标
+		//						PointCordTypeDef TempPoint;
+		//						TempPoint.x =curvpointsWolrd[0];
+		//						TempPoint.y =curvpointsWolrd[1];
+		//						TempPoint.z =curvpointsWolrd[2];
+		//						vPointCord.push_back(TempPoint);
 
 		//					}
-		//					short shlabnum =LabelImage.GetPixelGreyscale(scx,scy,scz);
-		//					float fprob=0;
-		//					if(shlabnum==0)
+		//					int npt=vPointCord.size();
+		//					outfile_norm << npt<<" "<<0<< "\n";
+		//					zxhImageDataT<short> PatchImage1,PatchImage2,PatchImage3;
+		//					int P_newsize[] = { SiglePatchSize,npt , 1, 1 };
+		//					PatchImage1.NewImage(2, P_newsize, spacing111, IntensityImage.GetImageInfo());
+		//					PatchImage2.NewImage(2, P_newsize, spacing111, IntensityImage.GetImageInfo());
+		//					PatchImage3.NewImage(2, P_newsize, spacing111, IntensityImage.GetImageInfo());
+		//					zxhImageData* PatchImageArray[3]={&PatchImage1,&PatchImage2,&PatchImage3};
+
+
+		//					//生成一个patch
+		//					for(int ptid=0;ptid<vPointCord.size();ptid++)
 		//					{
-		//						fprob=0;
+		//						//获取当前点的patch
+		//						float InputWorldCoord[4] ={ vPointCord[ptid].x,  vPointCord[ptid].y,  vPointCord[ptid].z, 0 };
+		//						float inputimagecoord[4]={ vPointCord[ptid].x,  vPointCord[ptid].y,  vPointCord[ptid].z, 0 };
+		//						LabelImage.GetImageInfo()->WorldToImage(inputimagecoord);
+		//						int scx = zxh::round(inputimagecoord[0]);
+		//						int scy = zxh::round(inputimagecoord[1]);
+		//						int scz = zxh::round(inputimagecoord[2]);
+		//						float finten=LabelImage.GetPixelGreyscale(scx,scy,scz,0);
+
+
+		//						if (LGeneratePatchExtractByWorldWithRandOffset_inxyzTest(PatchNumIdex,fdivec,InputWorldCoord, PatchInfo,IntensityImage, PatchImageArray) == false)
+		//						{
+		//							continue;//
+
+		//						}
+		//						short shlabnum =LabelImage.GetPixelGreyscale(scx,scy,scz);
+		//						float fprob=0;
+		//						if(shlabnum==0)
+		//						{
+		//							fprob=0;
+
+		//						}
+		//						if(shlabnum==2)
+		//						{
+		//							fprob=0.5;
+
+		//						}
+		//						if(shlabnum==1)
+		//						{
+		//							fprob=1;
+
+		//						}
+		//						PatchNumIdex++;
+		//						outfile_norm << PatchNumIdex << " " <<fprob<< "\n";
 
 		//					}
-		//					if(shlabnum==2)
-		//					{
-		//						fprob=0.5;
+		//					outfile_norm.close();
 
-		//					}
-		//					if(shlabnum==1)
-		//					{
-		//						fprob=1;
-
-		//					}
-		//					PatchNumIdex++;
-		//					outfile_norm << PatchNumIdex << " " <<fprob<< "\n";
-
-		//				}
-		//				outfile_norm.close();
-
-		//				string Str_T1 = SavePathname + "Patch_s1_"+num2str(i)+"_" +num2str(YN)+"_"+num2str(XN)+".nii.gz";
-		//				string Str_T2 = SavePathname + "Patch_s2_"+num2str(i)+"_" +num2str(YN)+"_"+num2str(XN)+".nii.gz";
-		//				string Str_T3 = SavePathname + "Patch_s3_"+num2str(i)+"_" +num2str(YN)+"_"+num2str(XN)+".nii.gz";
-		//				zxh::SaveImage(PatchImageArray[0], Str_T1);
-		//				zxh::SaveImage(PatchImageArray[1], Str_T2);
-		//				zxh::SaveImage(PatchImageArray[2], Str_T3);
-		//		}
-		//}
+		//					string Str_T1 = SavePathname + "Patch_s1_"+num2str(i)+"_" +num2str(YN)+"_"+num2str(XN)+".nii.gz";
+		//					string Str_T2 = SavePathname + "Patch_s2_"+num2str(i)+"_" +num2str(YN)+"_"+num2str(XN)+".nii.gz";
+		//					string Str_T3 = SavePathname + "Patch_s3_"+num2str(i)+"_" +num2str(YN)+"_"+num2str(XN)+".nii.gz";
+		//					zxh::SaveImage(PatchImageArray[0], Str_T1);
+		//					zxh::SaveImage(PatchImageArray[1], Str_T2);
+		//					zxh::SaveImage(PatchImageArray[2], Str_T3);
+		//			}
+		//	}
 	}
 	return 0;
 }

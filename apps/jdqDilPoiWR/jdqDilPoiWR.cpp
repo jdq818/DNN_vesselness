@@ -305,6 +305,10 @@ void DiaPoiWBal(zxhImageDataT<short>&imgNewBlaRaw,vector<PoiRadCordTypeDef> &vPa
 						imgNewBlaRaw.SetPixelByGreyscale(ix,iy,iz,it,0);
 					}
 	//遍历点
+					float fspacing[4]={0,0,0,0};
+    imgNewBlaRaw.GetImageSpacing(fspacing[0],fspacing[1],fspacing[2],fspacing[3]);
+	float fmin=zxh::minf(fspacing[0],fspacing[1]);
+	float fminspacing=zxh::minf(fmin,fspacing[2]);
 	for (int i=0;i<vPathPointsWorld.size();i++)
 	{
 		float PointPosWorld[ZXH_ImageDimensionMax]={0};
@@ -323,14 +327,14 @@ void DiaPoiWBal(zxhImageDataT<short>&imgNewBlaRaw,vector<PoiRadCordTypeDef> &vPa
 		if(PointPos[0]==156&&PointPos[1]==58&&PointPos[2]==34)
 							int xxx=0;
 		//局部‘卷积',注意边界溢出
-		int nkSize[3]={10,10,10};
+		int nkSize[3]={fR/fminspacing*1.5,fR/fminspacing*1.5,fR/fminspacing*1.5};
 		int nzs=zxh::maxf(PointPos[2]-nkSize[2],0);
 		int nys=zxh::maxf(PointPos[1]-nkSize[1],0);
 		int nxs=zxh::maxf(PointPos[0]-nkSize[0],0);
 
-		int nze=zxh::minf(PointPos[2]+nkSize[2],ImgSize[2]);
-		int nye=zxh::minf(PointPos[1]+nkSize[1],ImgSize[1]);
-		int nxe=zxh::minf(PointPos[0]+nkSize[0],ImgSize[0]);
+		int nze=zxh::minf(PointPos[2]+nkSize[2],ImgSize[2]-1);
+		int nye=zxh::minf(PointPos[1]+nkSize[1],ImgSize[1]-1);
+		int nxe=zxh::minf(PointPos[0]+nkSize[0],ImgSize[0]-1);
 
 
 
