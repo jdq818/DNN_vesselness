@@ -1209,7 +1209,7 @@ int main(int argc, char *argv[])
 		int nvcp=GenerateVesCentPontsRadset(LabelImage,LabelradImage,vVesCentPointCordrad);
 		int nvcptsize=GenerateVesCentPontsPrbset_Mask(LabelImage,vVesCentPointCordrad,vVesCentPointCord,shMask);
 
-		float labbal=10;//labbal=offline数量/正online数量
+		float labbal=90;//labbal=offline数量/正online数量
 		//挑选offline
 		int noffvptsize=nvcptsize*labbal;
 		vector<PointCordProbTypeDef> vSelecOffSetPointCord;//挑选offcent的点，以中心线为基准，数量呈正太分布，并在ROI内部；每点的概率符合一个设计好的函数分布
@@ -1311,6 +1311,7 @@ int main(int argc, char *argv[])
 		int slecnumofPatch=1;
 		int PatchNumIdex=0;
 		for (int i=0;i<numofPatch;i=i+slecnumofPatch)
+		//for (int i=53;i<54;i=i+slecnumofPatch)
 		{
 			vector<PointCordTypeDef>vPointCord;
 

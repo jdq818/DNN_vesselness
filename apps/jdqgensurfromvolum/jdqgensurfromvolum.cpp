@@ -305,6 +305,14 @@ bool Generate_gaussianrad_web(int nptofonepoint,float frad,vector<float>&vrandra
 }
 int main(int argc, char *argv[])
 {
+	string strintImg ="G:/work_jdq/for_DNN_vsls_v5/data/whole_GT_reorient/dataset01/image.nii.gz";
+	zxhImageDataT<short> IntensityImage;
+
+	//读取intensity image
+	zxh::OpenImageSafe(&IntensityImage,strintImg);
+	float PointWorldCor[3]={256,256,256};	
+	IntensityImage.GetImageInfo()->WorldToImage(PointWorldCor);
+
 	//-----------------------test simple codd----------------------
 	vector<float>vrandrad;
 	int nptofonepoint=100;

@@ -1,2 +1,2 @@
   
-SUBDIRS (jdqOrd_pot_from_img jdqBesselCurve zxhcaeDMPBesselCurve jdqMapPont2Img jdqDilPoiWR jdqgensurfromvolum  jdqzeromean jdqresampleCurve jdqMapPont2ImgWithPara jdqPatchExtractForDNNvsls) 
+SUBDIRS (jdqOrd_pot_from_img jdqBesselCurve zxhcaeDMPBesselCurve jdqMapPont2Img jdqDilPoiWR jdqgensurfromvolum  jdqzeromean jdqresampleCurve jdqMapPont2ImgWithPara jdqPatchExtractForDNNvsls jdqGenDirectionOfCur) 
