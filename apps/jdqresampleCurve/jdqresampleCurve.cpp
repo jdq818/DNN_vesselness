@@ -230,7 +230,7 @@ bool ReadTxtAsPC(char *chFileName,float fresamle, vector<PointCordTypeDef> &Poin
 {
 	if (chFileName == NULL)
 	{
-		cout << "Cannot find VTK-file!" << endl;
+		cout << "Cannot find txt-file!" << endl;
 		return 1;
 	}
 	//按照jda point格式读取line文件
@@ -238,8 +238,13 @@ bool ReadTxtAsPC(char *chFileName,float fresamle, vector<PointCordTypeDef> &Poin
 	std::vector<jdq2017::point3D> cl;
 	if ( ! jdq2017::readCenterline(chFileName, ref1))
 	{
-		std::cerr << "Error in reading line data" << std::endl;
-		return 1;
+		std::vector<double> rad;
+		std::vector<double> io;
+		if ( ! jdq2017::readReference(chFileName,ref1,rad,io))
+		{
+			std::cerr << "Error in reading line data" << std::endl;
+			return 1;
+		}
 	}
 	cout<<" Original number of points: " <<ref1.size()-1<<endl;
 	//resample the points
@@ -405,22 +410,22 @@ int main(int argc, char *argv[])
 		//chResultPathName ="J:/work_jdq/data_DNN/RCAAEF_32/training/dataset00/centerlines/res_vessel0";
 		ResampleCurvebyLength(resampllength,chCurvename,vPathPointsWorld);
 	}
-    cout<<"New number of points: " <<vPathPointsWorld.size()-1<<endl;
+	cout<<"New number of points: " <<vPathPointsWorld.size()-1<<endl;
 	int iCurveNameLen = strlen(chResultPathName) + strlen(".txt");
 	if (strcmp(chvtkortxt,"-vtk")==0)
 	{
-	char *CurveNamevtk = (char*)malloc(iCurveNameLen);
-	strcpy(CurveNamevtk, chResultPathName);
-	strcat(CurveNamevtk, ".vtk");
-	WriteVtk(vPathPointsWorld, CurveNamevtk);
+		char *CurveNamevtk = (char*)malloc(iCurveNameLen);
+		strcpy(CurveNamevtk, chResultPathName);
+		strcat(CurveNamevtk, ".vtk");
+		WriteVtk(vPathPointsWorld, CurveNamevtk);
 	}
 	//
 	if (strcmp(chvtkortxt,"-txt")==0)
 	{
-	char *CurveNametxt = (char*)malloc(iCurveNameLen);
-	strcpy(CurveNametxt, chResultPathName);
-	strcat(CurveNametxt, ".txt");
-	WriteTxt(vPathPointsWorld, CurveNametxt);
+		char *CurveNametxt = (char*)malloc(iCurveNameLen);
+		strcpy(CurveNametxt, chResultPathName);
+		strcat(CurveNametxt, ".txt");
+		WriteTxt(vPathPointsWorld, CurveNametxt);
 	}
 
 	cout << "resmaple Curve successfully!" << endl;

@@ -1,13 +1,13 @@
 
 
- /*=========================================================================
+/*=========================================================================
 
-  Program:   ZXH CoronaryArteryExtraction Software
-  Author:	 Dengqiang Jia
-  Module:    $RCSfle: zxhcaeDMP.cpp    $
-  Language:  C++
-  Date:      $Date: From  2011-03 $
-  Version:   $Revision: 2.2.1 $
+Program:   ZXH CoronaryArteryExtraction Software
+Author:	 Dengqiang Jia
+Module:    $RCSfle: zxhcaeDMP.cpp    $
+Language:  C++
+Date:      $Date: From  2011-03 $
+Version:   $Revision: 2.2.1 $
 
 =========================================================================*/
 /// \brief
@@ -21,7 +21,7 @@
 ///                                 finally set current transform to identity
 /// For preset transformation, unless same spacing FFD for the first Reg, otherwise would be treated as concatenation
 ///
- 
+
 //
 //void Help()
 //{
@@ -174,7 +174,7 @@ void WriteVtk(vector< PointCordTypeDef > PointCord, char* chFileName)
 
 	/*	int nPointNum = PointCord.size();*/
 
-	
+
 	int nPointNum = PointCord.size();
 
 	for (int i = 0; i < nPointNum; i++)
@@ -206,16 +206,16 @@ float ArcDist(int StartPosi,int EndPosi,vector<PointCordTypeDef> vPathPoints)
 	if (StartPosi=EndPosi)fLength=0;
 	else
 	{
-	for (int j=StartPosi;j<EndPosi;j++)
-	{
-		fFPoint[0]=vPathPoints[j].x;
-		fFPoint[1]=vPathPoints[j].y;
-		fFPoint[2]=vPathPoints[j].z;
-		fBPoint[0]=vPathPoints[j+1].x;
-		fBPoint[1]=vPathPoints[j+1].y;
-		fBPoint[2]=vPathPoints[j+1].z;
-		fLength=fLength+zxh::VectorOP_Distance(fFPoint,fFPoint,3);
-	}
+		for (int j=StartPosi;j<EndPosi;j++)
+		{
+			fFPoint[0]=vPathPoints[j].x;
+			fFPoint[1]=vPathPoints[j].y;
+			fFPoint[2]=vPathPoints[j].z;
+			fBPoint[0]=vPathPoints[j+1].x;
+			fBPoint[1]=vPathPoints[j+1].y;
+			fBPoint[2]=vPathPoints[j+1].z;
+			fLength=fLength+zxh::VectorOP_Distance(fFPoint,fFPoint,3);
+		}
 	}
 	return fLength;
 }
@@ -226,10 +226,10 @@ bool InSphere(float PosWorld[3],vector<PointCordTypeDef> vPathPoints)
 	{
 		float PosModWorld[3]={vPathPoints[i].x,vPathPoints[i].y,vPathPoints[i].z};
 		float Distmm2=zxh::VectorOP_Distance(PosWorld,PosModWorld,3);
-       if(Distmm2<(float)SPHERE_RADIUS) return true;
+		if(Distmm2<(float)SPHERE_RADIUS) return true;
 	}
-		return false;
-	
+	return false;
+
 }
 
 bool VesselnessMaskBaseOnDist(vector<PointCordTypeDef> vPathPointsWorld,zxhImageDataT<short>&imgReadVsls,zxhImageDataT<short>&imgReadNewVsls)
@@ -239,57 +239,57 @@ bool VesselnessMaskBaseOnDist(vector<PointCordTypeDef> vPathPointsWorld,zxhImage
 	imgReadNewVsls.GetImageSize(ImgNewVslsSize[0],ImgNewVslsSize[1],ImgNewVslsSize[2],ImgNewVslsSize[3]);
 	imgReadVsls.GetImageSize(ImgVslsSize[0],ImgVslsSize[1],ImgVslsSize[2],ImgVslsSize[3]);
 	for(int it=0;it<ImgNewVslsSize[3];++it)
-	for(int iz=0;iz<ImgNewVslsSize[2];++iz)
-	for(int iy=0;iy<ImgNewVslsSize[1];++iy)
-	for(int ix=0;ix<ImgNewVslsSize[0];++ix)
-	{
-		float Pos[ImageDimensionMax]={ix,iy,iz,it};
-		imgReadNewVsls.GetImageInfo()->ImageToWorld(Pos);
-		float PosWorld[ImageDimensionMax]={Pos[0],Pos[1],Pos[2],Pos[3]};
-		if(!(InSphere(PosWorld,vPathPointsWorld)))
-		{
-			imgReadNewVsls.SetPixelByGreyscale(ix,iy,iz,it,-1);
-		}
-		else
-		{//iMinNode.z * m_nImgWY * m_nImgWX + iMinNode.y * m_nImgWX + iMinNode.x
-			short m=imgReadVsls.GetImageData()[iz*ImgVslsSize[1]*ImgVslsSize[0]+iy*ImgVslsSize[0]+ix];
-			imgReadNewVsls.SetPixelByGreyscale(ix,iy,iz,it,imgReadVsls.GetImageData()[iz*ImgVslsSize[1]*ImgVslsSize[0]+iy*ImgVslsSize[0]+ix]);
-		}
+		for(int iz=0;iz<ImgNewVslsSize[2];++iz)
+			for(int iy=0;iy<ImgNewVslsSize[1];++iy)
+				for(int ix=0;ix<ImgNewVslsSize[0];++ix)
+				{
+					float Pos[ImageDimensionMax]={ix,iy,iz,it};
+					imgReadNewVsls.GetImageInfo()->ImageToWorld(Pos);
+					float PosWorld[ImageDimensionMax]={Pos[0],Pos[1],Pos[2],Pos[3]};
+					if(!(InSphere(PosWorld,vPathPointsWorld)))
+					{
+						imgReadNewVsls.SetPixelByGreyscale(ix,iy,iz,it,-1);
+					}
+					else
+					{//iMinNode.z * m_nImgWY * m_nImgWX + iMinNode.y * m_nImgWX + iMinNode.x
+						short m=imgReadVsls.GetImageData()[iz*ImgVslsSize[1]*ImgVslsSize[0]+iy*ImgVslsSize[0]+ix];
+						imgReadNewVsls.SetPixelByGreyscale(ix,iy,iz,it,imgReadVsls.GetImageData()[iz*ImgVslsSize[1]*ImgVslsSize[0]+iy*ImgVslsSize[0]+ix]);
+					}
 
-	}
-	return true;
+				}
+				return true;
 }
 bool InterpoforNewImage(vector<PointCordTypeDef> vPathPointsWorld,zxhImageDataT<short>&imgReadNewVsls)
 {
-	
+
 	for(int i=1;i<vPathPointsWorld.size()-1;i++)
 	{
-	float PointFPosWorld[3]={0};
-	float PointBPosWorld[3]={0};
-	int PointFPos[3]={0};
-	int PointBPos[3]={0};
-	PointFPosWorld[0]=vPathPointsWorld[i-1].x;
-	PointFPosWorld[1]=vPathPointsWorld[i-1].y;
-	PointFPosWorld[2]=vPathPointsWorld[i-1].z;
-	PointBPosWorld[0]=vPathPointsWorld[i].x;
-	PointBPosWorld[1]=vPathPointsWorld[i].y;
-	PointBPosWorld[2]=vPathPointsWorld[i].z;
-	imgReadNewVsls.GetImageInfo()->WorldToImage(PointFPosWorld);
-	PointFPos[0]=(int)(PointFPosWorld[0]+0.5);
-	PointFPos[1]=(int)(PointFPosWorld[1]+0.5);
-	PointFPos[2]=(int)(PointFPosWorld[2]+0.5);
-	imgReadNewVsls.GetImageInfo()->WorldToImage(PointBPosWorld);
-	PointBPos[0]=(int)(PointFPosWorld[0]+0.5);
-	PointBPos[1]=(int)(PointFPosWorld[1]+0.5);
-	PointBPos[2]=(int)(PointFPosWorld[2]+0.5);
-	if (PointFPos[0]==PointBPos[0]&&PointFPos[1]==PointBPos[1]&&PointFPos[2]==PointBPos[2]) continue;
-	int gNbr[6][3] = { {-1, 0, 0}, \
-					   { 1, 0, 0}, \
-					   { 0,-1, 0}, \
-					   { 0, 1, 0}, \
-					   { 0, 0,-1}, \
-					   { 0, 0, 1} };
-	for (int i = 0; i < 6; i++)
+		float PointFPosWorld[3]={0};
+		float PointBPosWorld[3]={0};
+		int PointFPos[3]={0};
+		int PointBPos[3]={0};
+		PointFPosWorld[0]=vPathPointsWorld[i-1].x;
+		PointFPosWorld[1]=vPathPointsWorld[i-1].y;
+		PointFPosWorld[2]=vPathPointsWorld[i-1].z;
+		PointBPosWorld[0]=vPathPointsWorld[i].x;
+		PointBPosWorld[1]=vPathPointsWorld[i].y;
+		PointBPosWorld[2]=vPathPointsWorld[i].z;
+		imgReadNewVsls.GetImageInfo()->WorldToImage(PointFPosWorld);
+		PointFPos[0]=(int)(PointFPosWorld[0]+0.5);
+		PointFPos[1]=(int)(PointFPosWorld[1]+0.5);
+		PointFPos[2]=(int)(PointFPosWorld[2]+0.5);
+		imgReadNewVsls.GetImageInfo()->WorldToImage(PointBPosWorld);
+		PointBPos[0]=(int)(PointFPosWorld[0]+0.5);
+		PointBPos[1]=(int)(PointFPosWorld[1]+0.5);
+		PointBPos[2]=(int)(PointFPosWorld[2]+0.5);
+		if (PointFPos[0]==PointBPos[0]&&PointFPos[1]==PointBPos[1]&&PointFPos[2]==PointBPos[2]) continue;
+		int gNbr[6][3] = { {-1, 0, 0}, \
+		{ 1, 0, 0}, \
+		{ 0,-1, 0}, \
+		{ 0, 1, 0}, \
+		{ 0, 0,-1}, \
+		{ 0, 0, 1} };
+		for (int i = 0; i < 6; i++)
 		{
 			int nx = PointFPos[0] + gNbr[i][0];
 			int ny = PointFPos[1] + gNbr[i][1];
@@ -297,7 +297,7 @@ bool InterpoforNewImage(vector<PointCordTypeDef> vPathPointsWorld,zxhImageDataT<
 
 
 
-	}
+		}
 	}
 	return true;
 }
@@ -305,8 +305,8 @@ bool BoundaryCorrect(int *PointPos,int ImgNewVslsSize[4])
 {
 	for (int i=0;i<3;i++)
 	{
-	PointPos[i]=zxh::maxf(0,PointPos[i]);
-	PointPos[i]=zxh::minf(ImgNewVslsSize[i]-1,PointPos[i]);
+		PointPos[i]=zxh::maxf(0,PointPos[i]);
+		PointPos[i]=zxh::minf(ImgNewVslsSize[i]-1,PointPos[i]);
 	}
 	return true;
 }
@@ -315,28 +315,28 @@ bool MapModelPointsToNewImageItself(vector<PointCordTypeDef> vPathPointsWorld,zx
 	int ImgNewVslsSize[4]={1};
 	imgReadNewVsls.GetImageSize(ImgNewVslsSize[0],ImgNewVslsSize[1],ImgNewVslsSize[2],ImgNewVslsSize[3]);
 	for(int it=0;it<ImgNewVslsSize[3];++it)
-	for(int iz=0;iz<ImgNewVslsSize[2];++iz)
-	for(int iy=0;iy<ImgNewVslsSize[1];++iy)
-	for(int ix=0;ix<ImgNewVslsSize[0];++ix)
-	{
-		imgReadNewVsls.SetPixelByGreyscale(ix,iy,iz,it,0);
-	}
-	
-	for (int i=0;i<vPathPointsWorld.size();i++)
-	{
-		float PointPosWorld[ImageDimensionMax]={0};
-		int PointPos[4]={0};
-		PointPosWorld[0]=vPathPointsWorld[i].x;
-		PointPosWorld[1]=vPathPointsWorld[i].y;
-		PointPosWorld[2]=vPathPointsWorld[i].z;
-		imgReadNewVsls.GetImageInfo()->WorldToImage(PointPosWorld);
-		PointPos[0]=zxh::round(PointPosWorld[0]);
-		PointPos[1]=(int)(PointPosWorld[1]+0.5);
-		PointPos[2]=(int)(PointPosWorld[2]+0.5);
-		BoundaryCorrect(PointPos,ImgNewVslsSize);
-		imgReadNewVsls.SetPixelByGreyscale(PointPos[0],PointPos[1],PointPos[2],PointPos[3],ZXH_Foreground);
-	}
-	return true;
+		for(int iz=0;iz<ImgNewVslsSize[2];++iz)
+			for(int iy=0;iy<ImgNewVslsSize[1];++iy)
+				for(int ix=0;ix<ImgNewVslsSize[0];++ix)
+				{
+					imgReadNewVsls.SetPixelByGreyscale(ix,iy,iz,it,0);
+				}
+
+				for (int i=0;i<vPathPointsWorld.size();i++)
+				{
+					float PointPosWorld[ImageDimensionMax]={0};
+					int PointPos[4]={0};
+					PointPosWorld[0]=vPathPointsWorld[i].x;
+					PointPosWorld[1]=vPathPointsWorld[i].y;
+					PointPosWorld[2]=vPathPointsWorld[i].z;
+					imgReadNewVsls.GetImageInfo()->WorldToImage(PointPosWorld);
+					PointPos[0]=zxh::round(PointPosWorld[0]);
+					PointPos[1]=(int)(PointPosWorld[1]+0.5);
+					PointPos[2]=(int)(PointPosWorld[2]+0.5);
+					BoundaryCorrect(PointPos,ImgNewVslsSize);
+					imgReadNewVsls.SetPixelByGreyscale(PointPos[0],PointPos[1],PointPos[2],PointPos[3],ZXH_Foreground);
+				}
+				return true;
 }
 bool MapModelPointsToNewImage(vector<PointCordTypeDef> vPathPointsWorld,zxhImageDataT<short>&imgReadNewVsls)
 {
@@ -346,67 +346,67 @@ bool MapModelPointsToNewImage(vector<PointCordTypeDef> vPathPointsWorld,zxhImage
 	imgReadNewVsls.GetImageSpacing(ImgNewVslsSpacing[0],ImgNewVslsSpacing[1],ImgNewVslsSpacing[2],ImgNewVslsSpacing[3]);
 	float fminpixdist=0.5*sqrt(ImgNewVslsSpacing[0]*ImgNewVslsSpacing[0]+ImgNewVslsSpacing[1]*ImgNewVslsSpacing[1]+ImgNewVslsSpacing[2]*ImgNewVslsSpacing[2]);
 	for(int it=0;it<ImgNewVslsSize[3];++it)
-	for(int iz=0;iz<ImgNewVslsSize[2];++iz)
-	for(int iy=0;iy<ImgNewVslsSize[1];++iy)
-	for(int ix=0;ix<ImgNewVslsSize[0];++ix)
-	{
-		imgReadNewVsls.SetPixelByGreyscale(ix,iy,iz,it,0);
-	}
-	vector<PointCordTypeDef> vPathPointsWorldMAPT;
-	vPathPointsWorldMAPT.clear();
-	for (int i=0;i<vPathPointsWorld.size();i++)
-	{
-		float PointPosWorld[ImageDimensionMax]={0};
-		int PointPos[4]={0};
-		PointCordTypeDef PointMAPT;
-		PointPosWorld[0]=vPathPointsWorld[i].x;
-		PointPosWorld[1]=vPathPointsWorld[i].y;
-		PointPosWorld[2]=vPathPointsWorld[i].z;
-		imgReadNewVsls.GetImageInfo()->WorldToImage(PointPosWorld);
-		PointPos[0]=zxh::round(PointPosWorld[0]);
-		PointPos[1]=(int)(PointPosWorld[1]+0.5);
-		PointPos[2]=(int)(PointPosWorld[2]+0.5);
-		BoundaryCorrect(PointPos,ImgNewVslsSize);
-		PointMAPT.x=PointPos[0];
-		PointMAPT.y=PointPos[1];
-		PointMAPT.z=PointPos[2];
-		vPathPointsWorldMAPT.push_back(PointMAPT);
-		imgReadNewVsls.SetPixelByGreyscale(PointPos[0],PointPos[1],PointPos[2],PointPos[3],ZXH_Foreground);
-	}
-
-	for (int mapNUM=1;mapNUM<vPathPointsWorldMAPT.size()-1;mapNUM++)//插值
-	{
-		PointCordTypeDef PointMAPTS;//start point in every step
-		PointCordTypeDef PointMAPTE;//End point in every step
-		PointMAPTS=vPathPointsWorldMAPT[mapNUM-1];
-		PointMAPTE=vPathPointsWorldMAPT[mapNUM];
-		for(int jz=PointMAPTS.z-8;jz<PointMAPTS.z+8;++jz)
-			for(int jy=PointMAPTS.y-8;jy<PointMAPTS.y+8;++jy)
-				for(int jx=PointMAPTS.x-8;jx<PointMAPTS.x+8;++jx)
+		for(int iz=0;iz<ImgNewVslsSize[2];++iz)
+			for(int iy=0;iy<ImgNewVslsSize[1];++iy)
+				for(int ix=0;ix<ImgNewVslsSize[0];++ix)
 				{
-					float fL[4]={0};
-					float fM[4]={0};
-					float fN[4]={0};
-					fL[0]=PointMAPTE.x-PointMAPTS.x;
-					fL[1]=PointMAPTE.y-PointMAPTS.y;
-					fL[2]=PointMAPTE.z-PointMAPTS.z;
-					fM[0]=jx-PointMAPTS.x;
-					fM[1]=jy-PointMAPTS.y;
-					fM[2]=jz-PointMAPTS.z;
-					fN[0]=jx-PointMAPTE.x;
-					fN[1]=jy-PointMAPTE.y;
-					fN[2]=jz-PointMAPTE.z;
-					float fcosineLM=zxh::VectorOP_Cosine(fL,fM,3);
-					float fcosineLN=-zxh::VectorOP_Cosine(fL,fN,3);
-					float fLengthM=zxh::MagnitudeOfVector(fM,3);
-					float fDist=fLengthM*sqrt(1-fcosineLM*fcosineLM);
-					if(fcosineLM>0.9&&fcosineLN>0.9&&fDist<=fminpixdist)
-					{
-						imgReadNewVsls.SetPixelByGreyscale(jx,jy,jz,0,ZXH_Foreground);
-					}
+					imgReadNewVsls.SetPixelByGreyscale(ix,iy,iz,it,0);
 				}
-	}
-	return true;
+				vector<PointCordTypeDef> vPathPointsWorldMAPT;
+				vPathPointsWorldMAPT.clear();
+				for (int i=0;i<vPathPointsWorld.size();i++)
+				{
+					float PointPosWorld[ImageDimensionMax]={0};
+					int PointPos[4]={0};
+					PointCordTypeDef PointMAPT;
+					PointPosWorld[0]=vPathPointsWorld[i].x;
+					PointPosWorld[1]=vPathPointsWorld[i].y;
+					PointPosWorld[2]=vPathPointsWorld[i].z;
+					imgReadNewVsls.GetImageInfo()->WorldToImage(PointPosWorld);
+					PointPos[0]=zxh::round(PointPosWorld[0]);
+					PointPos[1]=(int)(PointPosWorld[1]+0.5);
+					PointPos[2]=(int)(PointPosWorld[2]+0.5);
+					BoundaryCorrect(PointPos,ImgNewVslsSize);
+					PointMAPT.x=PointPos[0];
+					PointMAPT.y=PointPos[1];
+					PointMAPT.z=PointPos[2];
+					vPathPointsWorldMAPT.push_back(PointMAPT);
+					imgReadNewVsls.SetPixelByGreyscale(PointPos[0],PointPos[1],PointPos[2],PointPos[3],ZXH_Foreground);
+				}
+
+				for (int mapNUM=1;mapNUM<vPathPointsWorldMAPT.size()-1;mapNUM++)//插值
+				{
+					PointCordTypeDef PointMAPTS;//start point in every step
+					PointCordTypeDef PointMAPTE;//End point in every step
+					PointMAPTS=vPathPointsWorldMAPT[mapNUM-1];
+					PointMAPTE=vPathPointsWorldMAPT[mapNUM];
+					for(int jz=PointMAPTS.z-8;jz<PointMAPTS.z+8;++jz)
+						for(int jy=PointMAPTS.y-8;jy<PointMAPTS.y+8;++jy)
+							for(int jx=PointMAPTS.x-8;jx<PointMAPTS.x+8;++jx)
+							{
+								float fL[4]={0};
+								float fM[4]={0};
+								float fN[4]={0};
+								fL[0]=PointMAPTE.x-PointMAPTS.x;
+								fL[1]=PointMAPTE.y-PointMAPTS.y;
+								fL[2]=PointMAPTE.z-PointMAPTS.z;
+								fM[0]=jx-PointMAPTS.x;
+								fM[1]=jy-PointMAPTS.y;
+								fM[2]=jz-PointMAPTS.z;
+								fN[0]=jx-PointMAPTE.x;
+								fN[1]=jy-PointMAPTE.y;
+								fN[2]=jz-PointMAPTE.z;
+								float fcosineLM=zxh::VectorOP_Cosine(fL,fM,3);
+								float fcosineLN=-zxh::VectorOP_Cosine(fL,fN,3);
+								float fLengthM=zxh::MagnitudeOfVector(fM,3);
+								float fDist=fLengthM*sqrt(1-fcosineLM*fcosineLM);
+								if(fcosineLM>0.9&&fcosineLN>0.9&&fDist<=fminpixdist)
+								{
+									imgReadNewVsls.SetPixelByGreyscale(jx,jy,jz,0,ZXH_Foreground);
+								}
+							}
+				}
+				return true;
 }
 bool MapModelPointsToNewImageWithinR(vector<PointCordTypeDef> vPathPointsWorld,zxhImageDataT<short>&imgReadNewVsls,int SearchRange[4])//map line into original image in a range
 {
@@ -416,87 +416,87 @@ bool MapModelPointsToNewImageWithinR(vector<PointCordTypeDef> vPathPointsWorld,z
 	imgReadNewVsls.GetImageSpacing(ImgNewVslsSpacing[0],ImgNewVslsSpacing[1],ImgNewVslsSpacing[2],ImgNewVslsSpacing[3]);
 	float fminpixdist=sqrt(ImgNewVslsSpacing[0]*ImgNewVslsSpacing[0]+ImgNewVslsSpacing[1]*ImgNewVslsSpacing[1]+ImgNewVslsSpacing[2]*ImgNewVslsSpacing[2]);
 	for(int it=0;it<ImgNewVslsSize[3];++it)
-	for(int iz=0;iz<ImgNewVslsSize[2];++iz)
-	for(int iy=0;iy<ImgNewVslsSize[1];++iy)
-	for(int ix=0;ix<ImgNewVslsSize[0];++ix)
-	{
-		imgReadNewVsls.SetPixelByGreyscale(ix,iy,iz,it,0);
-	}
-	vector<PointCordTypeDef> vPathPointsWorldMAPT;
-	vPathPointsWorldMAPT.clear();
-	for (int i=0;i<vPathPointsWorld.size();i++)
-	{
-		float PointPosWorld[ImageDimensionMax]={0};
-		int PointPos[4]={0};
-		PointCordTypeDef PointMAPT;
-		PointPosWorld[0]=vPathPointsWorld[i].x;
-		PointPosWorld[1]=vPathPointsWorld[i].y;
-		PointPosWorld[2]=vPathPointsWorld[i].z;
-		imgReadNewVsls.GetImageInfo()->WorldToImage(PointPosWorld);
-		PointPos[0]=zxh::round(PointPosWorld[0]);
-		PointPos[1]=zxh::round(PointPosWorld[1]);
-		PointPos[2]=zxh::round(PointPosWorld[2]);
-		BoundaryCorrect(PointPos,ImgNewVslsSize);
-		PointMAPT.x=PointPos[0];
-		PointMAPT.y=PointPos[1];
-		PointMAPT.z=PointPos[2];
-		vPathPointsWorldMAPT.push_back(PointMAPT);
-		for(int kx=PointPos[0]-SearchRange[0];kx<PointPos[0]+SearchRange[0];kx++)
-			for(int ky=PointPos[1]-SearchRange[1];ky<PointPos[1]+SearchRange[1];ky++)
-				for(int kz=PointPos[2]-SearchRange[2];kz<PointPos[2]+SearchRange[2];kz++)
+		for(int iz=0;iz<ImgNewVslsSize[2];++iz)
+			for(int iy=0;iy<ImgNewVslsSize[1];++iy)
+				for(int ix=0;ix<ImgNewVslsSize[0];++ix)
 				{
-					int kPos[4]={0};
-					kPos[0]=zxh::round(kx);
-					kPos[1]=zxh::round(ky);
-					kPos[2]=zxh::round(kz);
-					BoundaryCorrect(kPos,ImgNewVslsSize);
-					imgReadNewVsls.SetPixelByGreyscale(kPos[0],kPos[1],kPos[2],kPos[3],ZXH_Foreground);
+					imgReadNewVsls.SetPixelByGreyscale(ix,iy,iz,it,0);
 				}
-	}
+				vector<PointCordTypeDef> vPathPointsWorldMAPT;
+				vPathPointsWorldMAPT.clear();
+				for (int i=0;i<vPathPointsWorld.size();i++)
+				{
+					float PointPosWorld[ImageDimensionMax]={0};
+					int PointPos[4]={0};
+					PointCordTypeDef PointMAPT;
+					PointPosWorld[0]=vPathPointsWorld[i].x;
+					PointPosWorld[1]=vPathPointsWorld[i].y;
+					PointPosWorld[2]=vPathPointsWorld[i].z;
+					imgReadNewVsls.GetImageInfo()->WorldToImage(PointPosWorld);
+					PointPos[0]=zxh::round(PointPosWorld[0]);
+					PointPos[1]=zxh::round(PointPosWorld[1]);
+					PointPos[2]=zxh::round(PointPosWorld[2]);
+					BoundaryCorrect(PointPos,ImgNewVslsSize);
+					PointMAPT.x=PointPos[0];
+					PointMAPT.y=PointPos[1];
+					PointMAPT.z=PointPos[2];
+					vPathPointsWorldMAPT.push_back(PointMAPT);
+					for(int kx=PointPos[0]-SearchRange[0];kx<PointPos[0]+SearchRange[0];kx++)
+						for(int ky=PointPos[1]-SearchRange[1];ky<PointPos[1]+SearchRange[1];ky++)
+							for(int kz=PointPos[2]-SearchRange[2];kz<PointPos[2]+SearchRange[2];kz++)
+							{
+								int kPos[4]={0};
+								kPos[0]=zxh::round(kx);
+								kPos[1]=zxh::round(ky);
+								kPos[2]=zxh::round(kz);
+								BoundaryCorrect(kPos,ImgNewVslsSize);
+								imgReadNewVsls.SetPixelByGreyscale(kPos[0],kPos[1],kPos[2],kPos[3],ZXH_Foreground);
+							}
+				}
 
-	for (int mapNUM=1;mapNUM<vPathPointsWorldMAPT.size()-1;mapNUM++)//插值
-	{
-		PointCordTypeDef PointMAPTS;//start point in every step
-		PointCordTypeDef PointMAPTE;//End point in every step
-		PointMAPTS=vPathPointsWorldMAPT[mapNUM-1];
-		PointMAPTE=vPathPointsWorldMAPT[mapNUM];
-		for(int jz=PointMAPTS.z-8;jz<PointMAPTS.z+8;++jz)
-			for(int jy=PointMAPTS.y-8;jy<PointMAPTS.y+8;++jy)
-				for(int jx=PointMAPTS.x-8;jx<PointMAPTS.x+8;++jx)
+				for (int mapNUM=1;mapNUM<vPathPointsWorldMAPT.size()-1;mapNUM++)//插值
 				{
-					float fL[4]={0};
-					float fM[4]={0};
-					float fN[4]={0};
-					fL[0]=PointMAPTE.x-PointMAPTS.x;
-					fL[1]=PointMAPTE.y-PointMAPTS.y;
-					fL[2]=PointMAPTE.z-PointMAPTS.z;
-					fM[0]=jx-PointMAPTS.x;
-					fM[1]=jy-PointMAPTS.y;
-					fM[2]=jz-PointMAPTS.z;
-					fN[0]=jx-PointMAPTE.x;
-					fN[1]=jy-PointMAPTE.y;
-					fN[2]=jz-PointMAPTE.z;
-					float fcosineLM=zxh::VectorOP_Cosine(fL,fM,3);
-					float fcosineLN=-zxh::VectorOP_Cosine(fL,fN,3);
-					float fLengthM=zxh::MagnitudeOfVector(fM,3);
-					float fDist=fLengthM*sqrt(1-fcosineLM*fcosineLM);
-					if(fcosineLM>0.9&&fcosineLN>0.9&&fDist<=fminpixdist)
-					{
-						for(int kx=jx-SearchRange[0];kx<jx+SearchRange[0];kx++)
-							for(int ky=jy-SearchRange[1];ky<jy+SearchRange[1];ky++)
-								for(int kz=jz-SearchRange[2];kz<jz+SearchRange[2];kz++)
+					PointCordTypeDef PointMAPTS;//start point in every step
+					PointCordTypeDef PointMAPTE;//End point in every step
+					PointMAPTS=vPathPointsWorldMAPT[mapNUM-1];
+					PointMAPTE=vPathPointsWorldMAPT[mapNUM];
+					for(int jz=PointMAPTS.z-8;jz<PointMAPTS.z+8;++jz)
+						for(int jy=PointMAPTS.y-8;jy<PointMAPTS.y+8;++jy)
+							for(int jx=PointMAPTS.x-8;jx<PointMAPTS.x+8;++jx)
+							{
+								float fL[4]={0};
+								float fM[4]={0};
+								float fN[4]={0};
+								fL[0]=PointMAPTE.x-PointMAPTS.x;
+								fL[1]=PointMAPTE.y-PointMAPTS.y;
+								fL[2]=PointMAPTE.z-PointMAPTS.z;
+								fM[0]=jx-PointMAPTS.x;
+								fM[1]=jy-PointMAPTS.y;
+								fM[2]=jz-PointMAPTS.z;
+								fN[0]=jx-PointMAPTE.x;
+								fN[1]=jy-PointMAPTE.y;
+								fN[2]=jz-PointMAPTE.z;
+								float fcosineLM=zxh::VectorOP_Cosine(fL,fM,3);
+								float fcosineLN=-zxh::VectorOP_Cosine(fL,fN,3);
+								float fLengthM=zxh::MagnitudeOfVector(fM,3);
+								float fDist=fLengthM*sqrt(1-fcosineLM*fcosineLM);
+								if(fcosineLM>0.9&&fcosineLN>0.9&&fDist<=fminpixdist)
 								{
-									int kPos[4]={0};
-									kPos[0]=zxh::round(kx);
-									kPos[1]=zxh::round(ky);
-									kPos[2]=zxh::round(kz);
-									BoundaryCorrect(kPos,ImgNewVslsSize);
-									imgReadNewVsls.SetPixelByGreyscale(kPos[0],kPos[1],kPos[2],kPos[3],ZXH_Foreground);
+									for(int kx=jx-SearchRange[0];kx<jx+SearchRange[0];kx++)
+										for(int ky=jy-SearchRange[1];ky<jy+SearchRange[1];ky++)
+											for(int kz=jz-SearchRange[2];kz<jz+SearchRange[2];kz++)
+											{
+												int kPos[4]={0};
+												kPos[0]=zxh::round(kx);
+												kPos[1]=zxh::round(ky);
+												kPos[2]=zxh::round(kz);
+												BoundaryCorrect(kPos,ImgNewVslsSize);
+												imgReadNewVsls.SetPixelByGreyscale(kPos[0],kPos[1],kPos[2],kPos[3],ZXH_Foreground);
+											}
 								}
-					}
+							}
 				}
-	}
-	return true;
+				return true;
 }
 bool MapModelPointsToNewImageNew(vector<PointCordTypeDef> vPathPointsWorld,zxhImageDataT<short>&imgReadNewVsls,int SearchRange[4])//map line into original image in a range
 {
@@ -580,8 +580,8 @@ bool MapModelPointsToImage(vector<PointCordTypeDef> vPathPointsWorld,zxhImageDat
 		PointPosWorld[2]=vPathPointsWorld[i].z;
 		//cout<<"WPoints:"<<i<<":" <<PointPosWorld[0]<<" "<<PointPosWorld[1]<<" "<<PointPosWorld[2]<<" "<<endl;
 		imgReadNewVsls.GetImageInfo()->WorldToImage(PointPosWorld);
-		
-	    PointPos[0]=zxh::round(PointPosWorld[0]);
+
+		PointPos[0]=zxh::round(PointPosWorld[0]);
 		PointPos[1]=zxh::round(PointPosWorld[1]);
 		PointPos[2]=zxh::round(PointPosWorld[2]);
 
@@ -672,14 +672,14 @@ bool VesselnessMaskBaseOnStructElement(vector<PointCordTypeDef> vPathPoints,zxhI
 }
 char *GetPathEXT(char *chFileName)
 {  char path_buffer[_MAX_PATH];  
-   char drive[_MAX_DRIVE];  
-   char dir[_MAX_DIR];  
-   char fname[_MAX_FNAME];  
-   char ext[_MAX_EXT];  
-  
-   _splitpath( chFileName, drive, dir, fname, ext );  
+char drive[_MAX_DRIVE];  
+char dir[_MAX_DIR];  
+char fname[_MAX_FNAME];  
+char ext[_MAX_EXT];  
 
-   return ext;
+_splitpath( chFileName, drive, dir, fname, ext );  
+
+return ext;
 }
 bool ReadTxtAsPC(char *chFileName,float fresamle, vector<PointCordTypeDef> &PointCord)
 {
@@ -695,8 +695,12 @@ bool ReadTxtAsPC(char *chFileName,float fresamle, vector<PointCordTypeDef> &Poin
 	std::vector<jdq2017::point3D> cl;
 	if ( ! jdq2017::readReference(chFileName, ref1, rad, io))
 	{
-		std::cerr << "Error in reading line data" << std::endl;
-		return 1;
+		if ( ! jdq2017::readCenterline(chFileName, ref1))
+		{
+			std::cerr << "Error in reading line data" << std::endl;
+			return 1;
+		}
+
 	}
 	//resample the points
 	jdq2017::ResamplePaths<jdq2017::point3D>Respler;
@@ -774,7 +778,7 @@ bool ReadPointTxt(char *filename,vector< PointCordTypeDef> &cl)
 			cl.push_back(strctTempPoint);
 		}
 	}
-	
+
 	return true;
 }
 bool ReadPointTxt_ostia(char *filename,vector< PointCordTypeDef> &cl)
@@ -804,7 +808,7 @@ bool ReadPointTxt_ostia(char *filename,vector< PointCordTypeDef> &cl)
 			cl.push_back(strctTempPoint);
 		}
 	}
-	
+
 	return true;
 }
 int main(int argc, char *argv[])
@@ -820,10 +824,10 @@ int main(int argc, char *argv[])
 	char *chResultName =argv[3];// "F:/Coronary_0/Coronary_Niessen/ProcessByLL/training/dataset00/vessel2/MCLine.nii.gz";
 	string RorN=string(argv[4]);
 	string RorS=string(argv[5]);//resample the line or not
-	
-	
+
+
 	//***Training Data as model****//
-	
+
 	zxhImageDataT<short> imgReadRaws,imgReadResoRaws;//Change by JDQ
 	float fNewImgSpacing[]={1,1,1,1};//Add by JDQ
 	float fOldImgSpacing[]={1,1,1,1};
@@ -834,8 +838,8 @@ int main(int argc, char *argv[])
 	}
 	/*if( zxh::OpenImage( &imgReadResoRaws, strFileNameResoRaw ) == false )
 	{
-		std::cerr << "Resoluted Raw image(nifti-file) is not found!"; 
-		return -1;
+	std::cerr << "Resoluted Raw image(nifti-file) is not found!"; 
+	return -1;
 	}*/
 	//imgReadResoRaws.GetImageSpacing(fOldImgSpacing[0],fOldImgSpacing[1],fOldImgSpacing[2],fOldImgSpacing[3] );//Add by JDQ
 	//imgReadRaw.GetImageExtent( fImgExtend ) ;
@@ -864,12 +868,12 @@ int main(int argc, char *argv[])
 
 		}
 		DetectFile.close();
-	
+
 	}
 	else if(strcmp(chext,".txt")==0)// read vtk file
 	{
 		cout<<"open successfully, format: txt"<<endl;
-	     fstream DetectFile;
+		fstream DetectFile;
 		DetectFile.open(chFileName,ios::in);
 		if(DetectFile)
 		{
@@ -879,14 +883,14 @@ int main(int argc, char *argv[])
 			}
 			else
 			{
-			ReadTxtAsPC(chFileName,fresamle, vPathPointsWorld);
+				ReadTxtAsPC(chFileName,fresamle, vPathPointsWorld);
 			}
 
 		}
 		DetectFile.close();
-		
+
 	}
-	
+
 	cout<<"Number of points:" <<vPathPointsWorld.size()-1<<endl;
 	if (RorN=="-N")//map to a totally new image
 	{
@@ -903,17 +907,16 @@ int main(int argc, char *argv[])
 
 
 
-	
 
-	
+
+
 	string chFileName2(chResultName);
 	zxh::SaveImage(&imgReadNewRaw,chFileName2.c_str());
 
-	
+
 
 	cout << "Map successfully!" << endl;
 
 
 }
 
- 

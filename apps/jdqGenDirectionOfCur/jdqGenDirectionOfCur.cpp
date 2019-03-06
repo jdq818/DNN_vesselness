@@ -195,7 +195,7 @@ void cf_findFileFromDir2(string mainDir, vector<string> &files)
 			{
 				char filename[_MAX_PATH];
 				strcpy_s(filename, dir);
-				strcat_s(filename, "\\");
+				//strcat_s(filename, "\\");
 				strcat_s(filename, fileinfo.name);
 				string temfilename = filename;
 				files.push_back(temfilename);
@@ -457,11 +457,10 @@ int main(int argc, char *argv[])
 	return -1;
 	}*/
 
-
-	string strFileNameRaw ="G:/work_jdq/RCAAEF_32/whole/dataset00/image/image.nii.gz";
-	string strCurveFilefolder ="G:/work_jdq/for_DNN_vsls_v5/infiles/data/whole_GT/dataset00/centerlinesRadius/";
-	string strDisDir="G:/work_jdq/for_DNN_vsls_v5/data/Otherdata/dispersedDirections/dispersedDirectionsSphere500.txt";
-	string strResultName ="G:/work_jdq/infiles/for_DNN_vsls_v6/DTI";
+	string strFileNameRaw ="J:/work_jdq/for_DNN_vsls_v5/data/whole_ori/dataset00/image/image.nii.gz";
+	string strCurveFilefolder ="J:/work_jdq/for_DNN_vsls_v5/data/whole_ori_jdq/dataset00/centerlinesRadius/";
+	string strDisDir="J:/work_jdq/for_DNN_vsls_v5/data/Otherdata/dispersedDirections/dispersedDirectionsSphere500.txt";
+	string strResultName ="J:/work_jdq/for_DNN_vsls_v5/infiles";
 
 	//¶ÁÈ¡Í¼Ïñ
 	zxhImageDataT<short> imgReadRaws;

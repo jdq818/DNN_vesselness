@@ -204,12 +204,12 @@ bool readCenterline(const char *filename,
       // Check input: count number of elements on line ...
       if (nrs.size() != nrElementsPerLine)
       {
-        std::cerr << "Error reading line " << linenr << " from file " 
+        std::cerr << "Error reading line defined by "<< nrElementsPerLine<< " Elements "<<linenr << " from file " 
                   << filename << std::endl;
         return false;
       }
       //Add point to centerline
-      cl.push_back(Point(-1*nrs[0], -1*nrs[1], nrs[2]));
+      cl.push_back(Point(nrs[0], nrs[1], nrs[2]));
     }
     return true;
 }

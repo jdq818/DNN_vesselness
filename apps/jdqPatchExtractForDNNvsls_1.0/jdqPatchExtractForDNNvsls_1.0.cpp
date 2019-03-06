@@ -97,7 +97,7 @@ Version:   $Revision: 2.2.1 $
 #include <algorithm>
 #include <sstream>
 #include <limits>
-
+#include<cmath>
 
 #include "zxhImageGipl.h" 
 #include "zxhImageData.h"
@@ -107,6 +107,7 @@ Version:   $Revision: 2.2.1 $
 #include <io.h>  
 #include <direct.h> //创建文件夹
 using namespace std;
+#define M_PI 3.14159265358979323846
 
 #include "jdq2017util.h"
 #include "jdqdijkstra.h"
@@ -1106,7 +1107,7 @@ bool GetOffCentVesPontsset_GaussDistri_Mask_Rand(int nvcptsize,float flabbal,vec
 					bool bIsInsideImage = LabelImage.InsideImage(nscx, nscy, nscz, 0); // 超过图像边界的，不给予考虑，也就是说，默认为normal myo
 					if (!bIsInsideImage)
 					{
-						std::cout << "warning: niebour node of point"<< i<< "is not inside image " << "\n"; //-----------------
+						std::cout << "warning: niebour node of point "<< i<< " is not inside the image " << "\n"; //-----------------
 						continue;
 					}
 					//判断是否已经取过
@@ -1329,108 +1330,81 @@ bool GenOnAndOffPonts(zxhImageDataT<short> LabelImage,zxhImageDataT<short> Label
 
 	return true;
 }
-int main(int argc, char *argv[])
+PointCordTypeDef RotateByVector(double old_x, double old_y, double old_z, double vx, double vy, double vz, double theta)
 {
-	//这个版本是用来抓取patch，和media18 J.W文章类似
-	//但是只有on line 和 offline
-	//就是说patch augmentation 只有transition
-	if( argc < 12)
-	{
-		cerr << "Usage: " << endl;
-		cerr << "jdqPatchExtractForTrain	curve	image  labimag pathinfor " << endl;
-		return -1;
-	}
-
-	string strintImg =string(argv[1]);
-	string strlabImg =string(argv[2]);
-	string strlabradImg =string(argv[3]);
-	string strROIImg =string(argv[4]); 
-	string strDisDir=string(argv[5]);  
-	string SavePathname = string(argv[6]);  
-	string trainortest = string(argv[7]);  
-	float fonlinerat= atof(argv[8]);  
-	float fofflinerat = atof(argv[9]);  
-	int HalfPatchLength=atoi(argv[10]);  
-	int N =atoi(argv[11]);  
-	int Nofz_s = atoi(argv[12]);  //z轴开始层，为了并行省时间
-	//--------------------------------------
-	//if(argc<6) int x=0;
-	//string strintImg ="I:/work_jdq/for_DNN_vsls_v5/data/whole_GT/dataset00/image.nii.gz";
-	//string strlabImg ="I:/work_jdq/for_DNN_vsls_v5/data/whole_GT/dataset00/lab_image.nii.gz";
-	//string strlabradImg ="I:/work_jdq/for_DNN_vsls_v5/data/whole_GT/dataset00/lab_image1_rad.nii.gz";
-	//string strROIImg ="I:/work_jdq/for_DNN_vsls_v5/data/whole_GT/dataset00/whs_lab_image_ROI.nii.gz";
-	//string strDisDir="I:/work_jdq/for_DNN_vsls_v5/data/Otherdata/dispersedDirections/dispersedDirectionsSphere500.txt";
-	//string SavePathname ="I:/work_jdq/for_DNN_vsls_v5/Patch_data_ur/5_5_5/crossValidate/target03/train/dataset00/";
-	//string trainortest = "-train";  
-	//	float fonlinerat=1;  
-	//float fofflinerat = 100;  
-	//int HalfPatchLength=2;  
-	//int N =2;  
-
-	//---------------patch大小相关参数设置---------------
-	
-
-
+    double r = theta * M_PI / 180;
+    double c = cos(r);
+    double s = sin(r);
+    double new_x = (vx*vx*(1 - c) + c) * old_x + (vx*vy*(1 - c) - vz*s) * old_y + (vx*vz*(1 - c) + vy*s) * old_z;
+    double new_y = (vy*vx*(1 - c) + vz*s) * old_x + (vy*vy*(1 - c) + c) * old_y + (vy*vz*(1 - c) - vx*s) * old_z;
+    double new_z = (vx*vz*(1 - c) - vy*s) * old_x + (vy*vz*(1 - c) + vx*s) * old_y + (vz*vz*(1 - c) + c) * old_z;
+    PointCordTypeDef Point3f;
+	Point3f.x=new_x;
+	Point3f.y=new_y;
+	Point3f.z=new_z;
+	return Point3f;
+}
+void Gen_fdivecByRotxyz(vector<PointCordTypeDef> &vxyzori,vector<vector<PointCordTypeDef>>&vvrandDir,int nRottime)
+{
 	srand((unsigned)time(NULL));
-	//char * bufferTscar=new char[1048576], * bufferTnormal=new char[1048576], *bufferNlink=new char[1048576] ;
-	int SiglePatchSize = (N * 2 + 1)*(N * 2 + 1)*(HalfPatchLength * 2 + 1);
-	//---------------读取图像---------------------------
-	zxhImageDataT<short> IntensityImage,LabelImage,LabelradImage,MaskImage;
-	zxhImageDataT<float>PatchProMask;
-
-	//读取intensity image
-	zxh::OpenImageSafe(&IntensityImage,strintImg);
-	MaskImage.NewImage(IntensityImage.GetImageInfo());
-	PatchProMask.NewImage(IntensityImage.GetImageInfo());
-	//读取label image
-	zxh::OpenImageSafe(&LabelImage,strlabImg);
-	////读取label rad image
-	zxh::OpenImageSafe(&LabelradImage,strlabradImg);
-	//读取单位球离散化向量
-	vector<PointCordTypeDef>vDisDir;
-	const char *chDisDir=strDisDir.c_str();
-	ReadDireTxt(chDisDir,vDisDir);
-
-	int PatchInfo[4] = { N, HalfPatchLength, 0, 0 };
-	float spacing111[] = { 1, 1, 1, 1 }; 
-	float fdivec[3][3]={0};
-	//x方向
-	fdivec[0][0]=1;
-	fdivec[0][1]=0;
-	fdivec[0][2]=0;
-
-	//y方向
-	fdivec[1][0]=0;
-	fdivec[1][1]=1;
-	fdivec[1][2]=0;
-
-	//z方向
-	fdivec[2][0]=0;
-	fdivec[2][1]=0;
-	fdivec[2][2]=1;
-	//---------------如果是Train数据,
-
-	if (strcmp(trainortest.c_str(),"-train")==0)
+	for (int nt=0;nt<nRottime;nt++)
 	{
-		zxhImageDataT<short>  ROIImage;
-		//读取ROI image
-		zxh::OpenImageSafe(&ROIImage,strROIImg);
-		//-----------------------------------------------读取label image， 并对各个label 的点数统计
-		vector<PointCordProbTypeDef> vlab1,vlab2,vlab3;
-		//label 1
-		int numlab1=SelectPointsFromlabimg(LabelImage,vlab1,1);
-		int numlab2=SelectPointsFromlabimg(LabelImage,vlab1,2);
-		int numlab3=SelectPointsFromlabimg(LabelImage,vlab1,3);
+		
+		for(int nxyz=0;nxyz<vxyzori.size();nxyz++)//将一个坐标系认为是三个点的组合
+		{
+			vector<PointCordTypeDef> vrandDire;
+			PointCordTypeDef tmpxyz;
+			vector<PointCordTypeDef> otherxyz;
+			for(int i=0;i<3;i++)//将这三个点首先分成两组，一组存放旋转方向，另一组存放要旋转的点
+			{
+				PointCordTypeDef tmpixyz=vxyzori[i];
+				if(i==nxyz)
+					tmpxyz=tmpixyz;//旋转前的坐标系中，依次选取x,y,z作为变得坐标系
 
-		vector<PointCordProbTypeDef>vVesCentPointCord;
-		vector<PointCordProbTypeDef> vSelecOffSetPointCord;
+				else
+				{
+					otherxyz.push_back(tmpixyz);
+				}
 
-		//依次挑选正负样本的点
-		float fvraPositive=fonlinerat;//选取的正样本占全部正样本的比例
-		float flabbal=fofflinerat;//labbal=offline数量/全部正online数量
-		cout<<"The ratios of the online samples and offline samples: "<<fvraPositive<<", "<<flabbal<<endl;
-		GenOnAndOffPonts_Rand(LabelImage,LabelradImage,ROIImage,vDisDir,vVesCentPointCord,vSelecOffSetPointCord,flabbal, fvraPositive);
 
+			}	
+			double old_x;
+			double old_y;
+			double old_z;
+			double vx;
+			double vy;
+			double vz;
+			
+			vrandDire.push_back(tmpxyz);
+			vx=tmpxyz.x;
+			vy=tmpxyz.y;
+			vz=tmpxyz.z;
+			for (int j=0;j<otherxyz.size();j++)//接下来，对otherxyz，进行旋转
+			{
+				PointCordTypeDef tmpjxyz;
+				tmpjxyz=otherxyz[j];
+				old_x=tmpjxyz.x;
+				old_y=tmpjxyz.y;
+				old_z=tmpjxyz.z;
+				//随机生成一个旋转角度
+				int ntehta =-180+(int)(360.0 * rand()/(RAND_MAX+1.0));
+				PointCordTypeDef newtmjxyz;
+				newtmjxyz=RotateByVector(old_x,  old_y,  old_z,  vx,  vy,  vz, ntehta);
+
+				vrandDire.push_back(newtmjxyz);
+			}
+
+
+vvrandDir.push_back(vrandDire);
+
+
+		}
+		
+	}
+}
+bool Gen_OnCentandOffCentPoints(int numAxis,vector<PointCordProbTypeDef> &vVesCentPointCord,vector<PointCordProbTypeDef>&vSelecOffSetPointCord,int SiglePatchSize,float spacing111[4],int PatchInfo[4],zxhImageDataT<short>&IntensityImage,zxhImageDataT<short>&MaskImage,zxhImageDataT<float>&PatchProMask,float fdivec[3][3],string SavePathname)
+{
+	
 		vector<PointCordProbTypeDef>vPointCord;
 		//将正负样本合并，加入到容器中
 		vPointCord.insert(vPointCord.end(),vVesCentPointCord.begin(),vVesCentPointCord.end());
@@ -1475,7 +1449,7 @@ int main(int argc, char *argv[])
 			PatchImage3.NewImage(2, P_newsize, spacing111, IntensityImage.GetImageInfo());
 			zxhImageData* PatchImageArray[3]={&PatchImage1,&PatchImage2,&PatchImage3};
 			int PatchNumIdex = 0;
-			string SavePatchinfo=SavePathname+"Patchinfo_"+num2str(ig)+".txt";
+			string SavePatchinfo=SavePathname+"Patchinfo_"+num2str(ig)+"_"+num2str(numAxis)+".txt";
 			ofstream outfile_norm(SavePatchinfo, ios::beg);//output
 			outfile_norm << npt<<" "<<0<< "\n";
 			for(int ptid=0;ptid<npt;ptid++)
@@ -1505,9 +1479,9 @@ int main(int argc, char *argv[])
 				PatchProMask.SetPixelByGreyscale(nscx,nscy,nscz,0,tempcurgroupponts[ptid].pr);
 			}
 			outfile_norm.close();
-			string Str_T1 = SavePathname + "Patch_s1_"+num2str(ig)+".nii.gz";
-			string Str_T2 = SavePathname + "Patch_s2_"+num2str(ig)+".nii.gz";
-			string Str_T3 = SavePathname + "Patch_s3_"+num2str(ig)+".nii.gz";
+			string Str_T1 = SavePathname + "Patch_s1_"+num2str(ig)+"_"+num2str(numAxis)+".nii.gz";
+			string Str_T2 = SavePathname + "Patch_s2_"+num2str(ig)+"_"+num2str(numAxis)+".nii.gz";
+			string Str_T3 = SavePathname + "Patch_s3_"+num2str(ig)+"_"+num2str(numAxis)+".nii.gz";
 			zxh::SaveImage(PatchImageArray[0], Str_T1);
 			zxh::SaveImage(PatchImageArray[1], Str_T2);
 			zxh::SaveImage(PatchImageArray[2], Str_T3);
@@ -1517,6 +1491,251 @@ int main(int argc, char *argv[])
 		    zxh::SaveImage(&MaskImage, Str_Mask);
 	 string Str_ProbMask = SavePathname + "P_ProbMask.nii.gz";
 		    zxh::SaveImage(&PatchProMask, Str_ProbMask);
+			return true;
+}
+bool Gen_OnCentPointsUsingRot(int numAxis,vector<PointCordProbTypeDef> &vVesCentPointCord,int SiglePatchSize,float spacing111[4],int PatchInfo[4],zxhImageDataT<short>&IntensityImage,float fdivec[3][3],string SavePathname)
+{
+	
+		vector<PointCordProbTypeDef>vPointCord;
+		//将正负样本合并，加入到容器中
+		vPointCord.insert(vPointCord.end(),vVesCentPointCord.begin(),vVesCentPointCord.end());
+
+		//将所有预备取patch的点打乱
+		random_shuffle(vPointCord.begin(), vPointCord.end());
+		int nsize=vPointCord.size();
+		////将所有的patch中心点分成多个组，每组不超过30000个点
+		int ngroup=nsize/30000;
+
+		vector<vector<PointCordProbTypeDef>>vpatchPont;
+		vector<PointCordProbTypeDef> tempcurgroupponts;
+		for(int ptid=0;ptid<nsize;ptid++)
+		{
+
+			PointCordProbTypeDef tempcurpont;
+			tempcurpont=vPointCord[ptid];
+			tempcurgroupponts.push_back(tempcurpont);
+			if (ptid==0) continue;
+			if(tempcurgroupponts.size()%30000==0)//取到第30000个点
+			{
+				vpatchPont.push_back(tempcurgroupponts);
+				tempcurgroupponts.clear();
+				continue;
+			}
+
+		}
+		vpatchPont.push_back(tempcurgroupponts);
+		int x=0;
+
+		for(int ig=0;ig<vpatchPont.size();ig++)
+		{
+			//按照组遍历，组编号为ig
+			vector<PointCordProbTypeDef> tempcurgroupponts=vpatchPont[ig];
+			int npt=tempcurgroupponts.size();
+			int P_newsize[] = { SiglePatchSize,npt , 1, 1 };
+			zxhImageDataT<short> PatchImage1,PatchImage2,PatchImage3;
+			PatchImage1.NewImage(2, P_newsize, spacing111, IntensityImage.GetImageInfo());
+			PatchImage2.NewImage(2, P_newsize, spacing111, IntensityImage.GetImageInfo());
+			PatchImage3.NewImage(2, P_newsize, spacing111, IntensityImage.GetImageInfo());
+			zxhImageData* PatchImageArray[3]={&PatchImage1,&PatchImage2,&PatchImage3};
+			int PatchNumIdex = 0;
+			string SavePatchinfo=SavePathname+"Patchinfo_"+num2str(ig)+"_"+num2str(numAxis)+".txt";
+			ofstream outfile_norm(SavePatchinfo, ios::beg);//output
+			outfile_norm << npt<<" "<<0<< "\n";
+			for(int ptid=0;ptid<npt;ptid++)
+			{
+
+				//-------------------Center--------------------
+				//获取当前点的patch
+				float InputWorldCoord[4] ={ tempcurgroupponts[ptid].x,  tempcurgroupponts[ptid].y,  tempcurgroupponts[ptid].z, 0 };
+				float inputimagecoord[4]={ tempcurgroupponts[ptid].x,  tempcurgroupponts[ptid].y,  tempcurgroupponts[ptid].z, 0 };
+				if (LGeneratePatchExtractByWorldWithRandOffset_inxyzTrain(PatchNumIdex,fdivec,InputWorldCoord, PatchInfo,IntensityImage, PatchImageArray) == false)
+				{
+					continue;//
+
+				}
+				PatchNumIdex++;
+				if (tempcurgroupponts[ptid].pr>1)
+				{
+					int x=0;
+				}
+				outfile_norm << PatchNumIdex << " " << tempcurgroupponts[ptid].pr<< "\n";
+					//在mask中标记取过的点
+					IntensityImage.GetImageInfo()->WorldToImage(inputimagecoord);
+				int nscx = zxh::round(inputimagecoord[0]);
+				int nscy = zxh::round(inputimagecoord[1]);
+				int nscz = zxh::round(inputimagecoord[2]);
+			}
+			outfile_norm.close();
+			string Str_T1 = SavePathname + "Patch_s1_"+num2str(ig)+"_"+num2str(numAxis)+".nii.gz";
+			string Str_T2 = SavePathname + "Patch_s2_"+num2str(ig)+"_"+num2str(numAxis)+".nii.gz";
+			string Str_T3 = SavePathname + "Patch_s3_"+num2str(ig)+"_"+num2str(numAxis)+".nii.gz";
+			zxh::SaveImage(PatchImageArray[0], Str_T1);
+			zxh::SaveImage(PatchImageArray[1], Str_T2);
+			zxh::SaveImage(PatchImageArray[2], Str_T3);
+		
+		}
+			return true;
+}
+int main(int argc, char *argv[])
+{
+	//这个版本是用来抓取patch，和media18 J.W文章类似
+	//但是只有on line 和 offline
+	//在jdqPatchExtractForDNNvsls基础上，加入了rotation
+	if( argc < 11)
+	{
+		cerr << "Usage: " << endl;
+		cerr << "jdqPatchExtractForTrain	curve	image  labimag pathinfor " << endl;
+		return -1;
+	}
+
+	string strintImg =string(argv[1]);
+	string strlabImg =string(argv[2]);
+	string strlabradImg =string(argv[3]);
+	string strROIImg =string(argv[4]); 
+	string strDisDir=string(argv[5]);  
+	string SavePathname = string(argv[6]);  
+	string trainortest = string(argv[7]);  
+	float fonlinerat= atof(argv[8]);  
+	float fofflinerat = atof(argv[9]);  
+	int HalfPatchLength=atoi(argv[10]);  
+	int N =atoi(argv[11]);  
+	int nrottim=atoi(argv[12]);  
+	//--------------------------------------
+	//if(argc<6) int x=0;
+	//string strintImg ="I:/work_jdq/for_DNN_vsls_v5/data/whole_GT/dataset00/image.nii.gz";
+	//string strlabImg ="I:/work_jdq/for_DNN_vsls_v5/data/whole_GT/dataset00/lab_image.nii.gz";
+	//string strlabradImg ="I:/work_jdq/for_DNN_vsls_v5/data/whole_GT/dataset00/lab_image1_rad.nii.gz";
+	//string strROIImg ="I:/work_jdq/for_DNN_vsls_v5/data/whole_GT/dataset00/whs_lab_image_ROI.nii.gz";
+	//string strDisDir="I:/work_jdq/for_DNN_vsls_v5/data/Otherdata/dispersedDirections/dispersedDirectionsSphere500.txt";
+	//string SavePathname ="I:/work_jdq/for_DNN_vsls_v5/Patch_data_ur/5_5_5/crossValidate/target03/infiles/";
+	//string trainortest = "-train";  
+	//	float fonlinerat=1;  
+	//float fofflinerat = 100;  
+	//int HalfPatchLength=2;  
+	//int N =2;  
+	//int nrottim=4;
+	//---------------patch大小相关参数设置---------------
+	
+
+
+	srand((unsigned)time(NULL));
+	//char * bufferTscar=new char[1048576], * bufferTnormal=new char[1048576], *bufferNlink=new char[1048576] ;
+	int SiglePatchSize = (N * 2 + 1)*(N * 2 + 1)*(HalfPatchLength * 2 + 1);
+	//---------------读取图像---------------------------
+	zxhImageDataT<short> IntensityImage,LabelImage,LabelradImage,MaskImage;
+	zxhImageDataT<float>PatchProMask;
+
+	//读取intensity image
+	zxh::OpenImageSafe(&IntensityImage,strintImg);
+	MaskImage.NewImage(IntensityImage.GetImageInfo());
+	PatchProMask.NewImage(IntensityImage.GetImageInfo());
+	//读取label image
+	zxh::OpenImageSafe(&LabelImage,strlabImg);
+	////读取label rad image
+	zxh::OpenImageSafe(&LabelradImage,strlabradImg);
+	//读取单位球离散化向量
+	vector<PointCordTypeDef>vDisDir;
+	const char *chDisDir=strDisDir.c_str();
+	ReadDireTxt(chDisDir,vDisDir);
+
+	int PatchInfo[4] = { N, HalfPatchLength, 0, 0 };
+	float spacing111[] = { 1, 1, 1, 1 }; 
+	float fdivec[3][3]={0};
+	//x方向
+	fdivec[0][0]=1;
+	fdivec[0][1]=0;
+	fdivec[0][2]=0;
+
+	//y方向
+	fdivec[1][0]=0;
+	fdivec[1][1]=1;
+	fdivec[1][2]=0;
+
+	//z方向
+	fdivec[2][0]=0;
+	fdivec[2][1]=0;
+	fdivec[2][2]=1;
+
+	//将取patch的坐标轴，进行旋转，旋转后，三个坐标轴依然保持互相垂直
+int nRottime=nrottim;//旋转 次数
+vector<PointCordTypeDef> vxyzori;
+PointCordTypeDef xori,yori,zori;
+xori.x=1;xori.y=0;xori.z=0;
+vxyzori.push_back(xori);
+yori.x=0;yori.y=1;yori.z=0;
+vxyzori.push_back(yori);
+zori.x=0;zori.y=0;zori.z=1;
+vxyzori.push_back(zori);
+vector<vector<PointCordTypeDef>>vrandDir;
+vrandDir.push_back(vxyzori);
+Gen_fdivecByRotxyz(vxyzori,vrandDir,nRottime);
+
+	//---------------如果是Train数据,
+
+	if (strcmp(trainortest.c_str(),"-train")==0)
+	{
+		zxhImageDataT<short>  ROIImage;
+		//读取ROI image
+		zxh::OpenImageSafe(&ROIImage,strROIImg);
+		//-----------------------------------------------读取label image， 并对各个label 的点数统计
+		vector<PointCordProbTypeDef> vlab1,vlab2,vlab3;
+		//label 1
+		int numlab1=SelectPointsFromlabimg(LabelImage,vlab1,1);
+		int numlab2=SelectPointsFromlabimg(LabelImage,vlab1,2);
+		int numlab3=SelectPointsFromlabimg(LabelImage,vlab1,3);
+
+		vector<PointCordProbTypeDef>vVesCentPointCord;
+		vector<PointCordProbTypeDef> vSelecOffSetPointCord;
+
+		//依次挑选正负样本的点
+		float fvraPositive=fonlinerat;//选取的正样本占全部正样本的比例
+		float flabbal=fofflinerat;//labbal=offline数量/全部正online数量
+		cout<<"The ratios of the online samples and offline samples: "<<fvraPositive<<", "<<flabbal<<endl;
+		GenOnAndOffPonts_Rand(LabelImage,LabelradImage,ROIImage,vDisDir,vVesCentPointCord,vSelecOffSetPointCord,flabbal, fvraPositive);
+		//首先按照原始的坐标轴选取中心线上的点和offcenterline的点
+		vector<PointCordTypeDef> vfirstaxis;
+		vfirstaxis=vrandDir[0];
+		//x方向
+		fdivec[0][0]=vfirstaxis[0].x;
+		fdivec[0][1]=vfirstaxis[0].y;
+		fdivec[0][2]=vfirstaxis[0].z;
+
+		//y方向
+		fdivec[1][0]=vfirstaxis[1].x;
+		fdivec[1][1]=vfirstaxis[1].y;
+		fdivec[1][2]=vfirstaxis[1].z;
+
+		//z方向
+		fdivec[2][0]=vfirstaxis[2].x;
+		fdivec[2][1]=vfirstaxis[2].y;
+		fdivec[2][2]=vfirstaxis[2].z;
+		Gen_OnCentandOffCentPoints(0,vVesCentPointCord,vSelecOffSetPointCord,SiglePatchSize,spacing111,PatchInfo,IntensityImage,MaskImage,PatchProMask,fdivec,SavePathname);
+	//其次，对oncenterline上的点，按照旋转生成的坐标轴选取patch
+		for(int k=1;k<vrandDir.size();k++)
+		{
+			vector<PointCordTypeDef> vlefttaxis;
+		vlefttaxis=vrandDir[k];
+		//x方向
+		fdivec[0][0]=vlefttaxis[0].x;
+		fdivec[0][1]=vlefttaxis[0].y;
+		fdivec[0][2]=vlefttaxis[0].z;
+
+		//y方向
+		fdivec[1][0]=vlefttaxis[1].x;
+		fdivec[1][1]=vlefttaxis[1].y;
+		fdivec[1][2]=vlefttaxis[1].z;
+
+		//z方向
+		fdivec[2][0]=vlefttaxis[2].x;
+		fdivec[2][1]=vlefttaxis[2].y;
+		fdivec[2][2]=vlefttaxis[2].z;
+				
+		cout<<"Number of online Points: "<<vVesCentPointCord.size()<<", Using "<<num2str(k)<<"/"<<num2str(vrandDir.size()-1)<<" coordinate system. "<<endl;
+		Gen_OnCentPointsUsingRot(k,vVesCentPointCord,SiglePatchSize,spacing111,PatchInfo,IntensityImage,fdivec,SavePathname);
+	    cout<<"Number of offline Points: "<<vSelecOffSetPointCord.size()<<", Using "<<num2str(k)<<"/"<<num2str(vrandDir.size()-1)<<" coordinate system. "<<endl;
+		Gen_OnCentPointsUsingRot(k,vSelecOffSetPointCord,SiglePatchSize,spacing111,PatchInfo,IntensityImage,fdivec,SavePathname);
+		}
+		   cout<<"Number of patch Points: "<<(vSelecOffSetPointCord.size()+vVesCentPointCord.size())*(vrandDir.size()+1)<<endl;
 	}
 	if (strcmp(trainortest.c_str(),"-test")==0)
 	{
@@ -1537,7 +1756,7 @@ int main(int argc, char *argv[])
 		int numfenkuai=4;
 		int slecnumofPatch=1;
 		int PatchNumIdex=0;
-		for (int i=Nofz_s;i<numofPatch;i=i+slecnumofPatch)
+		for (int i=0;i<numofPatch;i=i+slecnumofPatch)
 			//for (int i=53;i<54;i=i+slecnumofPatch)
 		{
 			vector<PointCordTypeDef>vPointCord;
@@ -1611,8 +1830,8 @@ int main(int argc, char *argv[])
 						string Str_T2 = SavePathname + "Patch_s2_"+num2str(i)+"_" +num2str(YN)+"_"+num2str(XN)+".nii.gz";
 						string Str_T3 = SavePathname + "Patch_s3_"+num2str(i)+"_" +num2str(YN)+"_"+num2str(XN)+".nii.gz";
 						zxh::SaveImage(PatchImageArray[0], Str_T1);
-						//zxh::SaveImage(PatchImageArray[1], Str_T2);
-						//zxh::SaveImage(PatchImageArray[2], Str_T3);
+						zxh::SaveImage(PatchImageArray[1], Str_T2);
+						zxh::SaveImage(PatchImageArray[2], Str_T3);
 				}
 		}
 			string Str_Mask = SavePathname + "P_Mask.nii.gz";

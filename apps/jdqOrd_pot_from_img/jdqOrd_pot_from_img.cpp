@@ -202,7 +202,7 @@ void WriteModCA2Txt(char *chFileName,vector<PointCordTypeDef>vPBr)
 	int nPointNum = vPBr.size();
 	for (int i = 0; i < nPointNum; i++)
 	{
-		
+
 		WriteFileTxt <<right<<fixed<<setfill('4')<<setprecision(4)<<-1*vPBr[i].x<<' '<<-1*vPBr[i].y<<' '<<vPBr[i].z<<'\n';
 
 	}	
@@ -353,12 +353,12 @@ int main(int argc, char *argv[])//此程序用来排序从图像中读取的点，输出的是图像坐
 					{
 						PpbE=PKeyPont;
 
-						  cout << "Detect successfully: the left ostia !" << endl;
+						cout << "Detect successfully: the left ostia !" << endl;
 					}
 					else if(shInt==1400)
 					{
 						PpbE=PKeyPont;
-						  cout << "Detect successfully: the right ostia !" << endl;
+						cout << "Detect successfully: the right ostia !" << endl;
 					}
 				}
 
@@ -366,7 +366,7 @@ int main(int argc, char *argv[])//此程序用来排序从图像中读取的点，输出的是图像坐
 			if (PpbE.b==-1500)
 			{
 				std::cerr << "You should check the ostia!"; 
-		           return -1;
+				return -1;
 			}
 			//定义叶子点
 			vector<PointCordTypeDef> vLePo;
@@ -376,7 +376,7 @@ int main(int argc, char *argv[])//此程序用来排序从图像中读取的点，输出的是图像坐
 			vector<PointCordTypeDef>vOrderPonts;
 			vector<PointCordTypeDef>vOrderPontsImg;
 			vOrderPonts.clear();
-				vOrderPontsImg.clear();
+			vOrderPontsImg.clear();
 			//vOrderPonts.push_back(PpbE);
 			//找到离叶子节点距离最近的两个点
 			vector<float> vDist;
@@ -406,7 +406,7 @@ int main(int argc, char *argv[])//此程序用来排序从图像中读取的点，输出的是图像坐
 					{
 						fMinDist=fDist;
 						nMinIndex=i;
-					
+
 					}
 				}
 
@@ -415,24 +415,24 @@ int main(int argc, char *argv[])//此程序用来排序从图像中读取的点，输出的是图像坐
 				//cout<<pmindstP.x<<","<<pmindstP.y<<","<<pmindstP.z<<":"<<pmindstP.b<<endl;
 				if( fMinDist>8)
 				{
-			    cout<<"current point"<<PpbE.x<<","<<PpbE.y<<","<<PpbE.z<<" To-"<<endl;
-				cout<<vPKPont[nMinIndex].x<<","<<vPKPont[nMinIndex].y<<","<<vPKPont[nMinIndex].z<<":"<<fMinDist<<endl;
+					cout<<"current point"<<PpbE.x<<","<<PpbE.y<<","<<PpbE.z<<" To-"<<endl;
+					cout<<vPKPont[nMinIndex].x<<","<<vPKPont[nMinIndex].y<<","<<vPKPont[nMinIndex].z<<":"<<fMinDist<<endl;
 					std::cerr << "You should check the manual selected points!"; 
-		           return -1;
+					return -1;
 				}
-		
 
-					float nminP[3]={vPKPont[nMinIndex].x,vPKPont[nMinIndex].y,vPKPont[nMinIndex].z};
-					imgReadRaws.GetImageInfo()->ImageToWorld(nminP);
-					pmindstP.x=nminP[0];
-						pmindstP.y=nminP[1];
-						pmindstP.z=nminP[2];
-						pmindstP.b=fMinDist;
+
+				float nminP[3]={vPKPont[nMinIndex].x,vPKPont[nMinIndex].y,vPKPont[nMinIndex].z};
+				imgReadRaws.GetImageInfo()->ImageToWorld(nminP);
+				pmindstP.x=nminP[0];
+				pmindstP.y=nminP[1];
+				pmindstP.z=nminP[2];
+				pmindstP.b=fMinDist;
 				vOrderPonts.push_back(pmindstP);
 				PpbE=vPKPont[nMinIndex];
 				vOrderPontsImg.push_back(PpbE);
 				vPKPont.erase(vPKPont.begin()+nMinIndex);      
-				
+
 			}
 			//write to txt
 			string strname="";
@@ -449,9 +449,9 @@ int main(int argc, char *argv[])//此程序用来排序从图像中读取的点，输出的是图像坐
 			strcat(chFileName, chRname);
 			strcat(chFileName, ".txt");
 			WriteModCA2Txt(chFileName,vOrderPonts);
-		    cout << "Save successfully: ordered points (world) curve !" << endl;
+			cout << "Save successfully: ordered points (world) curve !" << endl;
 			//保存图像坐标
-						int nFileLen1 = strlen(chResFilefold) + strlen("OrdPimg_")+strlen(chRname)+strlen(".txt") + 1;
+			int nFileLen1 = strlen(chResFilefold) + strlen("OrdPimg_")+strlen(chRname)+strlen(".txt") + 1;
 			char *chFileName1 = (char*)malloc(nFileLen1);
 			strcpy(chFileName1, chResFilefold);
 			strcat(chFileName1, "OrdPimg_");
