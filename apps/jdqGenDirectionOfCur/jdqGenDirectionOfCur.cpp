@@ -263,6 +263,59 @@ bool Calc_divec(int i,float fdivec[3],vector<PointCordTypeDef> &ref,float clSamp
 	zxh::VectorOP_Normalise(fdivec,3);
 	return true;
 }
+bool Calc_divec_DeltaX(int i,float fdivec[3],vector<PointCordTypeDef> &ref,float clSampling)
+{
+	PointCordTypeDef curPontW=ref[i];//当前点
+	//寻找距离当前点距离为delta的点的位置
+	float ftmsumdist=0;
+	int nFPosi=-1;
+	bool bfind=false;
+	for (int k=i;k<ref.size()-1;k++)
+	{
+		float curpointcor[3]={ref[k].x,ref[k].y,ref[k].z};
+		float nextpointcor[3]={ref[k+1].x,ref[k+1].y,ref[k+1].z};
+		float dist =zxh::VectorOP_Distance(nextpointcor,curpointcor,3);
+		ftmsumdist=ftmsumdist+dist;
+		if (ftmsumdist>=curPontW.rad)
+		{
+			nFPosi=k+1;//找到下游为delta的点
+			bfind=true;
+			break;
+		}
+
+	}
+	if (!bfind)
+	{
+		ftmsumdist=0;
+		nFPosi=-1;
+		if (ftmsumdist<curPontW.rad)//如果最后一个点到当前点的距离依然小于rad,反向搜索
+		{
+			for (int k=i;k>0;k--)
+			{
+				float curpointcor[3]={ref[k].x,ref[k].y,ref[k].z};
+				float nextpointcor[3]={ref[k-1].x,ref[k-1].y,ref[k-1].z};
+				float dist =zxh::VectorOP_Distance(nextpointcor,curpointcor,3);
+				ftmsumdist=ftmsumdist+dist;
+				if (ftmsumdist>=curPontW.rad)
+				{
+					nFPosi=k-1;//找到下游为delta的点
+					break;
+				}
+
+			}
+		}
+	}
+	PointCordTypeDef FPontW=ref[nFPosi];
+	fdivec[0]=FPontW.x-curPontW.x;
+	fdivec[1]=FPontW.y-curPontW.y;
+	fdivec[2]=FPontW.z-curPontW.z;
+	zxh::VectorOP_Normalise(fdivec,3);
+	if (fdivec[0]==0&&fdivec[1]==0&&fdivec[2]==0)
+	{
+		int x=0;
+	}
+	return true;
+}
 bool World2Image(float fnPontWor[3],int nPontCor[3],zxhImageDataT<short>&imgReadRaws)
 {
 	float fWorldCoord[3]={fnPontWor[0],fnPontWor[1],fnPontWor[2]};
@@ -365,6 +418,65 @@ bool ReadAndSaveThePointsAndDirection(vector<string> vcurvefiles,float fresamle,
 
 	return true;
 }
+bool ReadAndSaveThePointsAndDirection_byDeltaX(vector<string> vcurvefiles,float fresamle,zxhImageDataT<short>&imgReadRaws,vector<vector<PointCordDireTypeDef>>&vvCurvePontswithDire,vector<PointCordDireTypeDef>&vALLPontDir)
+{
+	vector<PointCordTypeDef> vPathPointsWorld;
+	for(int i=0; i<vcurvefiles.size();i++)//遍历每个curve文件
+	{	
+		vPathPointsWorld.clear();
+		string curvename=vcurvefiles[i];
+		ReadTxtAsPC(curvename.c_str(),fresamle, vPathPointsWorld);
+		vector<PointCordDireTypeDef> vtmpPontDir;//存储单个curve文件的点和方向
+		vtmpPontDir.clear();
+		for(int j=0; j<vPathPointsWorld.size();j++)//遍历每个curve文件
+		{	
+			//计算第j个点的切向量
+			float fdivec[3]={0,0,0};
+			Calc_divec_DeltaX(j,fdivec,vPathPointsWorld,fresamle);
+			int nPontCor[3]={0,0,0};
+			float fnPontWor[3]={vPathPointsWorld[j].x,vPathPointsWorld[j].y,vPathPointsWorld[j].z};
+			World2Image(fnPontWor,nPontCor,imgReadRaws);
+
+			DireCordTypeDef tpdir;
+			PointCordTypeDef tpcor;
+			fsavePontsDirn(nPontCor,fdivec,tpcor,tpdir);
+			//-------------------------------------按照curve 文件存
+			//如果某个点已经存在；
+			int ind=0;
+			if(bexitPont(tpcor,vtmpPontDir,ind))
+			{
+				vtmpPontDir[ind].vdire.push_back(tpdir);
+			}
+			else//如果不存在
+			{
+				PointCordDireTypeDef tempPonDire;
+				vector<DireCordTypeDef>vtpcor;
+				vtpcor.push_back(tpdir);
+				tempPonDire.pcor=tpcor;
+				tempPonDire.vdire=vtpcor;
+				vtmpPontDir.push_back(tempPonDire);
+			}
+			//-------------------------------------按照所有点 存
+			int indall=0;
+			if(bexitPont(tpcor,vALLPontDir,indall))
+			{
+				vALLPontDir[indall].vdire.push_back(tpdir);
+			}
+			else//如果不存在
+			{
+				PointCordDireTypeDef tempPonDire1;
+				vector<DireCordTypeDef>vtpcor1;
+				vtpcor1.push_back(tpdir);
+				tempPonDire1.pcor=tpcor;
+				tempPonDire1.vdire=vtpcor1;
+				vALLPontDir.push_back(tempPonDire1);
+			}
+		}
+		vvCurvePontswithDire.push_back(vtmpPontDir);
+	}
+
+	return true;
+}
 bool StorUnique(vector<DireCordTypeDef> &vUnorgaPointsWorld)
 {
 	bool bunique=true;
@@ -375,7 +487,8 @@ bool StorUnique(vector<DireCordTypeDef> &vUnorgaPointsWorld)
 		{
 			float fj[3]={vUnorgaPointsWorld[j].dx,vUnorgaPointsWorld[j].dy,vUnorgaPointsWorld[j].dz};
 			float dist=zxh::VectorOP_Distance(fi,fj,3);
-			if(dist<0.00001)
+			float fcosangle=zxh::VectorOP_Cosine(fi,fj,3);
+			if(dist<0.00001||abs(fcosangle)>0.9)
 			{
 				vUnorgaPointsWorld.erase(vUnorgaPointsWorld.begin()+j);
 				j--;
@@ -434,7 +547,10 @@ bool MergeAllTheDirecOnSphere(vector<PointCordDireTypeDef> vALLPontDir,vector<Di
 		{
 			int x3=0;
 		}
-
+			if(vsize==2)
+		{
+			int x3=0;
+		}
 		vsizedirc.push_back(vsize);
 		vALLPontMergDir.push_back(tmpmerge);
 
@@ -449,7 +565,7 @@ bool MergeAllTheDirecOnSphere(vector<PointCordDireTypeDef> vALLPontDir,vector<Di
 }
 int main(int argc, char *argv[])
 {
-	//这个工具是是用来将曲线的每个点的切向量合并成一个，带有方向的点的文件。
+	//这个工具是是用来将曲线的每个点的切向量合并成一个，生成带有方向的点的文件。
 	/*if( argc < 5 )
 	{
 	cerr << "Usage: " << endl;
@@ -457,14 +573,20 @@ int main(int argc, char *argv[])
 	return -1;
 	}*/
 
-	string strFileNameRaw ="J:/work_jdq/for_DNN_vsls_v5/data/whole_ori/dataset00/image/image.nii.gz";
-	string strCurveFilefolder ="J:/work_jdq/for_DNN_vsls_v5/data/whole_ori_jdq/dataset00/centerlinesRadius/";
+	string strFileNameRaw ="J:/work_jdq/for_DNN_vsls_v5/data/whole_RCEEAF_ori/training_procbyjdq/LabAndImages_ref/dataset00/image.nii.gz";
+	string strCurveFilefolder ="J:/work_jdq/for_DNN_vsls_v5/data/whole_RCEEAF_ori/training_procbyjdq/LabAndImages_ref/dataset00/centerlinesRadius/";
+	string strRadImgfile="J:/work_jdq/for_DNN_vsls_v5/data/whole_RCEEAF_ori/training_procbyjdq/LabAndImages_ref/dataset00/lab_image1_rad.nii.gz";
 	string strDisDir="J:/work_jdq/for_DNN_vsls_v5/data/Otherdata/dispersedDirections/dispersedDirectionsSphere500.txt";
 	string strResultName ="J:/work_jdq/for_DNN_vsls_v5/infiles";
 
 	//读取图像
-	zxhImageDataT<short> imgReadRaws;
+	zxhImageDataT<short> imgReadRaws,imgRadImg;
 	if( zxh::OpenImageSafe( &imgReadRaws, strFileNameRaw ) == false )
+	{
+		std::cerr << "Raw image(nifti-file) is not found!"<<endl; 
+		return -1;
+	}
+		if( zxh::OpenImageSafe( &imgRadImg, strRadImgfile ) == false )
 	{
 		std::cerr << "Raw image(nifti-file) is not found!"<<endl; 
 		return -1;
@@ -486,8 +608,8 @@ int main(int argc, char *argv[])
 	vvCurvePontswithDire.clear();
 	vector<PointCordDireTypeDef> vALLPontDir;//所有文件的点放在一起
 	vALLPontDir.clear();
-	ReadAndSaveThePointsAndDirection(vcurvefiles,fresamle,imgReadRaws,vvCurvePontswithDire,vALLPontDir);
-
+	//ReadAndSaveThePointsAndDirection(vcurvefiles,fresamle,imgReadRaws,vvCurvePontswithDire,vALLPontDir);
+	ReadAndSaveThePointsAndDirection_byDeltaX(vcurvefiles,fresamle,imgReadRaws,vvCurvePontswithDire,vALLPontDir);
 	//-----------------------2，将每一个点的坐标和已经确定的球面向量（500个)比对，合并后再保存-----------。
 	vector<PointCordDireTypeDef>vALLPontMergeDir;
 	MergeAllTheDirecOnSphere(vALLPontDir,vDisDir,vALLPontMergeDir);
