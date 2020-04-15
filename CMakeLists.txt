@@ -3,11 +3,11 @@ cmake_minimum_required(VERSION 2.6)
 # Set the project name.
 #
 
-PROJECT (jdqprojCAE)
+PROJECT (jdqDNNvessel)
 
 
 
-SET (jdqprojCAE_CAN_BUILD 1)
+SET (jdqDNNvessel_CAN_BUILD 1)
 
 SET (EXECUTABLE_OUTPUT_PATH  ${PROJECT_BINARY_DIR}/bin CACHE INTERNAL
   "Where to put the executables")
@@ -23,7 +23,7 @@ SET (LIBRARY_OUTPUT_PATH ${PROJECT_BINARY_DIR}/lib CACHE INTERNAL
 set(CMAKE_MODULE_PATH "${UCLTK_BINARY_DIR}/CMakeModules")
    
 
-IF (jdqprojCAE_CAN_BUILD)
+IF (jdqDNNvessel_CAN_BUILD)
 
   #
   # Here is where you can list the sub-directories holding your local 
@@ -70,4 +70,4 @@ add_definitions(-DHAVE_NIFTI)
 add_definitions(-DHAVE_ZLIB)
  
   
-ENDIF (jdqprojCAE_CAN_BUILD)
+ENDIF (jdqDNNvessel_CAN_BUILD)
